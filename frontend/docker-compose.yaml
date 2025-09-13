@@ -1,0 +1,8 @@
+services:
+  frontend:
+    container_name: frontend
+    build:
+      dockerfile: Dockerfile
+      context: .
+    ports:
+      - 4173:4173

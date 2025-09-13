@@ -6,7 +6,7 @@ import { resolve } from "path";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), EnvironmentPlugin("all"), tailwindcss()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       "@src": resolve(__dirname, "./src"),

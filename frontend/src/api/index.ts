@@ -1,6 +1,6 @@
 import { getAnonId } from "@src/utils/anon";
 
-const API_URL = process.env.API_URL;
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default class RequestAPI {
   static async getBoard() {
@@ -14,6 +14,8 @@ export default class RequestAPI {
     if (token) params.set("token", token);
     else params.set("anon_id", anonId);
 
-    return new WebSocket(process.env.API_URL_WS + "/ws?" + params.toString());
+    return new WebSocket(
+      import.meta.env.VITE_API_URL_WS + "/ws?" + params.toString(),
+    );
   }
 }

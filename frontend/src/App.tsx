@@ -5,10 +5,10 @@ import RequestAPI from "@src/api";
 import { BOARD_WIDTH, BOARD_HEIGHT } from "./constants";
 
 const App = () => {
-  const canvasRef = useRef(null);
-  const containerRef = useRef(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const [ws, setWs] = useState(null);
+  const [ws, setWs] = useState<WebSocket | null>(null);
   const [cooldown, setCooldown] = useState(0);
 
   const [scale, setScale] = useState(20);
@@ -18,7 +18,10 @@ const App = () => {
   const [dragging, setDragging] = useState(false);
   const [lastMouse, setLastMouse] = useState(null);
 
-  const [hoverPixel, setHoverPixel] = useState(null);
+  const [hoverPixel, setHoverPixel] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [selectedPixel, setSelectedPixel] = useState<{
     x: number;
     y: number;
@@ -38,7 +41,12 @@ const App = () => {
       console.log(data);
       if (data.type === "init") {
         // отрисовать всю доску
+        if (!canvasRef.current) return;
+
         const ctx = canvasRef.current.getContext("2d");
+
+        if (!ctx) return;
+
         data.board.forEach((row, y) => {
           row.forEach((color, x) => {
             if (color) {
