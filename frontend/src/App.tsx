@@ -364,6 +364,7 @@ const App = () => {
         ref={containerRef}
       >
         <canvas
+          className="shadow-lg"
           width={BOARD_WIDTH}
           height={BOARD_HEIGHT}
           style={{

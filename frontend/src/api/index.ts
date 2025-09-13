@@ -4,6 +4,13 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 type TPixel = { x: number; y: number; color: string; user: string };
 
+export type TUser = {
+  id: number;
+  is_admin: number;
+  google_id: string;
+  email: string;
+};
+
 export default class RequestAPI {
   static async getBoard(): Promise<TPixel[]> {
     return fetch(API_URL + "/board").then((res) => res.json());
@@ -19,5 +26,9 @@ export default class RequestAPI {
     return new WebSocket(
       import.meta.env.VITE_API_URL_WS + "/ws?" + params.toString(),
     );
+  }
+
+  static async getMe(token: string): Promise<TUser> {
+    return fetch(API_URL + "/me" + `?token=${token}`).then((res) => res.json());
   }
 }

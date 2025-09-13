@@ -49,7 +49,7 @@ const PaintPopup: FC<TPaintPopupProps> = ({
         >
           {cooldown > 0 ? `Подожди ${cooldown}с` : "Поставить"}
         </button>
-        <button className="btn" onClick={onCancel}>
+        <button className="btn btn-neutral btn-outline" onClick={onCancel}>
           Отмена
         </button>
       </div>

@@ -1,5 +1,7 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  themes: light --default;
+}
 
 body {
   overflow: hidden;
@@ -9,4 +11,33 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+#root {
+  background-color: var(--color-neutral-content);
+}
+
+input[type="color"] {
+  border: none;
+  border-radius: var(--radius-sm);
+}
+
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+}
+
+:where(
+  :root:has(
+    .modal-open,
+    .modal[open],
+    .modal:target,
+    .modal-toggle:checked,
+    .drawer:not(.drawer-open) > .drawer-toggle:checked
+  )
+) {
+  scrollbar-gutter: auto;
 }

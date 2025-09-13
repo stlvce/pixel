@@ -1,10 +1,13 @@
-import { useContext, useEffect } from "react";
+import { useState, useContext, useEffect } from "react";
 
 import GoogleAuth from "@src/libs/google-auth";
 import { AuthContext } from "@src/store";
+import RequestAPI from "@src/api";
+import type { TUser } from "@src/api";
 
 const AuthModal = () => {
   const { token, setToken } = useContext(AuthContext);
+  const [user, setUser] = useState<TUser | null>(null);
 
   const openAuthModal = () => {
     const authModal = document.getElementById(
@@ -31,16 +34,26 @@ const AuthModal = () => {
     }
   }, [setToken]);
 
+  useEffect(() => {
+    if (!token) return;
+
+    RequestAPI.getMe(token).then((res) => {
+      setUser(res);
+    });
+  }, [token]);
+
   if (token) {
     return (
-      <div className="dropdown dropdown-end fixed z-10 right-5 top-5">
+      <div className="dropdown dropdown-end fixed z-10 right-2 top-2">
         <div
           className="avatar avatar-placeholder cursor-pointer"
           tabIndex={0}
           role="button"
         >
-          <div className="bg-neutral text-neutral-content w-10 rounded-full">
-            <span className="text-xl">D</span>
+          <div className="bg-neutral text-neutral-content w-12 rounded-full">
+            <span className="text-xl">
+              {user?.email ? user.email.substring(0, 1).toUpperCase() : ""}
+            </span>
           </div>
         </div>
 
@@ -48,7 +61,7 @@ const AuthModal = () => {
           tabIndex={0}
           className="dropdown-content menu bg-base-300 rounded-box z-1 w-52 p-5 shadow-sm mt-2"
         >
-          <li className="mb-5">username</li>
+          <li className="mb-5">{user?.email}</li>
           <li>
             <button
               className="btn btn-outline btn-error"
@@ -64,7 +77,7 @@ const AuthModal = () => {
 
   return (
     <>
-      <button className="btn fixed z-10 right-5 top-5" onClick={openAuthModal}>
+      <button className="btn fixed z-10 right-2 top-2" onClick={openAuthModal}>
         Войти
       </button>
       <dialog id="auth-modal" className="modal">
