@@ -206,6 +206,8 @@ const App = () => {
   };
 
   const handleTouchMove: TouchEventHandler<HTMLDivElement> = (e) => {
+    e.preventDefault();
+
     if (e.touches.length === 1 && dragging && lastMouse) {
       const touch = e.touches[0];
       const dx = touch.clientX - lastMouse.x;
@@ -351,7 +353,7 @@ const App = () => {
       <AuthModal />
 
       <div
-        className={`relative w-screen h-screen overflow-hidden ${dragging ? "cursor-grabbing" : "cursor-default"}`}
+        className={`relative w-screen h-screen overflow-hidden ${dragging ? "cursor-grabbing" : "cursor-default"} touch-none`}
         onWheel={handleWheel}
         onMouseMove={handleMouseMove}
         onMouseDown={handleMouseDown}
