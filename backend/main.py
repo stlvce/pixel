@@ -5,21 +5,24 @@ from fastapi import (
     Query,
     HTTPException,
     Depends,
+    Request,
 )
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from jose import jwt, JWTError, ExpiredSignatureError
+from jose import jwt
 import time
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from typing import Dict, List
 import uuid
+import httpx
 
-from database import SessionLocal, Base, get_db, engine
+from config.database import SessionLocal, Base, get_db, engine
+from config.settings import app_settings, google_settings
 from models import User, Pixel
-from schemas import TokenRequest
+from ws_manager import ConnectionManager
+from security import get_current_user, verify_jwt
 
 
 app = FastAPI(
@@ -56,23 +59,50 @@ cooldowns = {}
 
 Base.metadata.create_all(bind=engine)
 
-GOOGLE_CLIENT_ID = (
-    "1093433149059-7109nsgh75hd2gu2rtac0s620hrsgeto.apps.googleusercontent.com"
-)
-JWT_SECRET = "4ee29ef54c58849ea0cddd45361a613977f89be0287fbb68293317a0499ebd42"
-JWT_ALG = "HS256"
+manager = ConnectionManager()
 
 
-@app.post("/auth/google")
-async def auth_google(data: TokenRequest, db: Session = Depends(get_db)):
+@app.get("/auth/google/login")
+def google_login():
+    google_auth_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth"
+        f"?client_id={google_settings.CLIENT_ID}"
+        f"&redirect_uri=http://localhost:8000/auth/google/callback"
+        "&response_type=code"
+        "&scope=openid%20email%20profile"
+    )
+    return RedirectResponse(google_auth_url)
+
+
+@app.get("/auth/google/callback")
+async def google_callback(request: Request, code: str, db: Session = Depends(get_db)):
+    print(code)
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "code": code,
+        "client_id": google_settings.CLIENT_ID,
+        "client_secret": google_settings.JWT_SECRET,
+        "redirect_uri": "http://localhost:8000/auth/google/callback",
+        "grant_type": "authorization_code",
+    }
+
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(token_url, data=data)
+        token_json = token_resp.json()
+
+    id_token_str = token_json.get("id_token")
+    if not id_token_str:
+        raise HTTPException(status_code=400, detail="No ID token returned from Google")
+
     try:
+        # Проверка Google ID токена
         idinfo = id_token.verify_oauth2_token(
-            data.token, requests.Request(), GOOGLE_CLIENT_ID
+            id_token_str, requests.Request(), google_settings.CLIENT_ID
         )
         google_id = idinfo["sub"]
         email = idinfo["email"]
 
-        # проверяем или создаем пользователя
+        # Проверяем или создаем пользователя
         user = db.query(User).filter(User.google_id == google_id).first()
         if not user:
             user = User(google_id=google_id, email=email)
@@ -80,123 +110,25 @@ async def auth_google(data: TokenRequest, db: Session = Depends(get_db)):
             db.commit()
             db.refresh(user)
 
-        # генерируем JWT
+        # Генерируем собственный JWT
         payload = {
             "sub": str(user.id),
             "email": email,
-            "exp": int((datetime.utcnow() + timedelta(days=7)).timestamp()),
+            "exp": int(
+                (
+                    datetime.utcnow() + timedelta(days=app_settings.JWT_EXPIRE_DAYS)
+                ).timestamp()
+            ),
         }
+        my_token = jwt.encode(
+            payload, app_settings.JWT_SECRET, algorithm=app_settings.JWT_ALG
+        )
 
-        token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
-
-        return {"access_token": token}
-    except Exception:
+        # Редирект на фронт с токеном
+        redirect_url = f"http://localhost:5173?token={my_token}"
+        return RedirectResponse(redirect_url)
+    except ValueError:
         raise HTTPException(status_code=401, detail="Invalid Google token")
-
-
-def verify_jwt(token: str):
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
-        return payload
-    except ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid JWT")
-
-
-@app.get("/test-token")
-async def test_token(token: str):
-    try:
-        payload = verify_jwt(token)
-        return {"email": payload["email"]}
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: Dict[int, List[WebSocket]] = {}
-
-    async def connect(self, user_id: int, websocket: WebSocket):
-        if user_id not in self.active_connections:
-            self.active_connections[user_id] = []
-        self.active_connections[user_id].append(websocket)
-
-    def disconnect(self, user_id: int, websocket: WebSocket):
-        if user_id in self.active_connections:
-            self.active_connections[user_id].remove(websocket)
-            if not self.active_connections[user_id]:
-                del self.active_connections[user_id]
-
-    async def send_to_user(self, user_id: int, message: dict):
-        """Отправка сообщения только конкретному пользователю"""
-        if user_id in self.active_connections:
-            for connection in self.active_connections[user_id]:
-                await connection.send_json(message)
-
-    async def broadcast(self, message: dict):
-        """Отправка всем пользователям"""
-        for connections in self.active_connections.values():
-            for connection in connections:
-                await connection.send_json(message)
-
-
-manager = ConnectionManager()
-
-
-# @app.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
-#     try:
-#         user_data = verify_jwt(token)
-#         user_id = user_data["sub"]
-#     except HTTPException:
-#         await websocket.close(code=1008)
-#         return
-
-#     await websocket.accept()
-#     print(f"✅ Connected: {user_data['email']}")
-
-#     db: Session = SessionLocal()
-
-#     try:
-#         while True:
-#             data = await websocket.receive_json()
-#             x, y, color = data["x"], data["y"], data["color"]
-
-#             # кулдаун 60 секунд
-#             last_time = cooldowns.get(user_id, 0)
-#             now = time.time()
-#             if now - last_time < 60:
-#                 await websocket.send_json(
-#                     {
-#                         "type": "error",
-#                         "error": "Подожди 60 сек перед следующим пикселем",
-#                     }
-#                 )
-#                 continue
-
-#             # сохраняем пиксель
-#             pixel = Pixel(x=x, y=y, color=color, user_id=user_id)
-#             db.add(pixel)
-#             db.commit()
-
-#             cooldowns[user_id] = now
-
-#             # рассылаем всем (можно добавить менеджер подключений)
-#             await websocket.send_json(
-#                 {
-#                     "type": "pixel",
-#                     "x": x,
-#                     "y": y,
-#                     "color": color,
-#                     "user": user_data["email"],
-#                 }
-#             )
-
-#     except WebSocketDisconnect:
-#         print(f"❌ Disconnected: {user_data['email']}")
-#     finally:
-#         db.close()
 
 
 @app.websocket("/ws")
@@ -271,6 +203,8 @@ async def websocket_endpoint(
             )
     except WebSocketDisconnect:
         manager.disconnect(conn_key, websocket)
+    finally:
+        db.close()
 
 
 @app.get("/board")
@@ -282,17 +216,6 @@ def get_board(db: Session = Depends(get_db)):
             {"x": p.x, "y": p.y, "color": p.color, "user": p.user.email} for p in pixels
         ]
     )
-
-
-def get_current_user(token: str = Query(...), db: Session = Depends(get_db)):
-    try:
-        payload = verify_jwt(token)
-        user = db.query(User).filter(User.id == payload["sub"]).first()
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        return user
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 @app.delete("/moderation/delete_pixel")
@@ -313,3 +236,8 @@ def delete_pixel(
     db.commit()
 
     return {"status": "deleted", "x": x, "y": y}
+
+
+@app.get("/me")
+def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return user
