@@ -1,25 +1,55 @@
+import { useContext } from "react";
+
+import GoogleAuth from "@src/libs/google-auth";
+import { AuthContext } from "@src/store";
+
 const AuthModal = () => {
+  const { token, setToken } = useContext(AuthContext);
+
+  const openAuthModal = () => {
+    const authModal = document.getElementById(
+      "auth-modal",
+    ) as HTMLDialogElement;
+
+    if (authModal) {
+      authModal.showModal();
+    }
+  };
+
+  const handleLogout = () => {
+    setToken(null);
+    localStorage.removeItem("jwt");
+  };
+
+  if (token) {
+    return (
+      <button className="btn fixed z-10 right-5 top-5" onClick={handleLogout}>
+        Выйти
+      </button>
+    );
+  }
+
   return (
     <>
-      <button
-        className="btn btn-primary fixed z-10 right-5 top-5"
-        onClick={() => document.getElementById("my_modal_1").showModal()}
-      >
+      <button className="btn fixed z-10 right-5 top-5" onClick={openAuthModal}>
         Войти
       </button>
-      <dialog id="my_modal_1" className="modal">
+      <dialog id="auth-modal" className="modal">
         <div className="modal-box">
-          <h3 className="font-bold text-lg">Hello!</h3>
-          <p className="py-4">
-            Press ESC key or click the button below to close
-          </p>
-          <div className="modal-action">
-            <form method="dialog">
-              {/* if there is a button in form, it will close the modal */}
-              <button className="btn">Close</button>
-            </form>
+          <form method="dialog">
+            <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">
+              ✕
+            </button>
+          </form>
+          <h3 className="font-bold text-lg">Вход</h3>
+          <div className="p-5">
+            <GoogleAuth onSuccess={setToken} />
           </div>
         </div>
+
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
       </dialog>
     </>
   );

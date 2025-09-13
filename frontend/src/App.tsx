@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
-import { AuthModal } from "./components";
+import { SideBar, AuthModal, PaintPopup } from "@src/components";
+import RequestAPI from "@src/api";
+import { BOARD_WIDTH, BOARD_HEIGHT } from "./constants";
 
 const App = () => {
   const canvasRef = useRef(null);
@@ -17,19 +19,23 @@ const App = () => {
   const [lastMouse, setLastMouse] = useState(null);
 
   const [hoverPixel, setHoverPixel] = useState(null);
-  const [selectedPixel, setSelectedPixel] = useState(null);
+  const [selectedPixel, setSelectedPixel] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   // скорость для инерции
   const velocity = useRef({ x: 0, y: 0 });
-  const animationRef = useRef(null);
+  const animationRef = useRef<number | null>(null);
 
-  const width = 200;
-  const height = 100;
+  const [color, setColor] = useState("#ff0000");
 
   useEffect(() => {
-    const socket = new WebSocket("ws://localhost:8000/ws");
+    const token = localStorage.getItem("jwt");
+    const socket = RequestAPI.openSocket(token);
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log(data);
       if (data.type === "init") {
         // отрисовать всю доску
         const ctx = canvasRef.current.getContext("2d");
@@ -52,7 +58,7 @@ const App = () => {
     // белый фон
     const ctx = canvasRef.current.getContext("2d");
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
   }, []);
 
   const drawPixel = (x, y, color) => {
@@ -69,7 +75,6 @@ const App = () => {
       return;
     }
 
-    const color = "#ff0000"; // TODO: выбор цвета
     const user = "test_user";
 
     ws.send(JSON.stringify({ ...selectedPixel, color, user }));
@@ -89,7 +94,7 @@ const App = () => {
 
   // зум относительно курсора
   const handleWheel = (e) => {
-    e.preventDefault();
+    // e.preventDefault();
 
     const rect = containerRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -138,7 +143,7 @@ const App = () => {
       const rect = containerRef.current.getBoundingClientRect();
       const x = Math.floor((e.clientX - rect.left - offset.x) / scale);
       const y = Math.floor((e.clientY - rect.top - offset.y) / scale);
-      if (x >= 0 && y >= 0 && x < width && y < height) {
+      if (x >= 0 && y >= 0 && x < BOARD_WIDTH && y < BOARD_HEIGHT) {
         setHoverPixel({ x, y });
       } else {
         setHoverPixel(null);
@@ -176,7 +181,7 @@ const App = () => {
         const rect = containerRef.current.getBoundingClientRect();
         const x = Math.floor((e.clientX - rect.left - offset.x) / scale);
         const y = Math.floor((e.clientY - rect.top - offset.y) / scale);
-        if (x >= 0 && y >= 0 && x < width && y < height) {
+        if (x >= 0 && y >= 0 && x < BOARD_WIDTH && y < BOARD_HEIGHT) {
           setSelectedPixel({ x, y });
         }
       }
@@ -206,8 +211,23 @@ const App = () => {
     animationRef.current = requestAnimationFrame(animateInertia);
   };
 
+  useEffect(() => {
+    RequestAPI.getBoard()
+      .then((res) => res.json())
+      .then((data) => {
+        const ctx = canvasRef.current.getContext("2d");
+        // ctx.clearRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+
+        data.forEach((pixel) => {
+          ctx.fillStyle = pixel.color;
+          ctx.fillRect(pixel.x, pixel.y, 1, 1);
+        });
+      });
+  }, []);
+
   return (
     <div className="App">
+      <SideBar color={color} changeColor={(newColor) => setColor(newColor)} />
       <AuthModal />
 
       <div
@@ -219,14 +239,14 @@ const App = () => {
         ref={containerRef}
       >
         <canvas
-          width={width}
-          height={height}
+          width={BOARD_WIDTH}
+          height={BOARD_HEIGHT}
           style={{
             position: "absolute",
             left: offset.x,
             top: offset.y,
-            width: width * scale,
-            height: height * scale,
+            width: BOARD_WIDTH * scale,
+            height: BOARD_HEIGHT * scale,
             imageRendering: "pixelated",
           }}
           ref={canvasRef}
@@ -256,7 +276,7 @@ const App = () => {
               width: scale,
               height: scale,
               boxSizing: "border-box",
-              border: "2px solid blue",
+              border: `2px solid ${color}`,
               pointerEvents: "none",
             }}
           />
@@ -265,23 +285,12 @@ const App = () => {
 
       {/* Панель управления */}
       {selectedPixel && (
-        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white px-5 py-2.5 rounded-lg shadow-xl/10 border-1 border-gray-200">
-          <p className="text-zinc-800">
-            Пиксель: {selectedPixel.x}, {selectedPixel.y}
-          </p>
-          <div className="flex gap-2 mt-2">
-            <button
-              className="btn btn-primary"
-              onClick={handlePlacePixel}
-              disabled={cooldown > 0}
-            >
-              {cooldown > 0 ? `Подожди ${cooldown}с` : "Поставить"}
-            </button>
-            <button className="btn" onClick={() => setSelectedPixel(null)}>
-              Отмена
-            </button>
-          </div>
-        </div>
+        <PaintPopup
+          selectedPixel={selectedPixel}
+          handlePlacePixel={handlePlacePixel}
+          cooldown={cooldown}
+          onCancel={() => setSelectedPixel(null)}
+        />
       )}
     </div>
   );
