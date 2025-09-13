@@ -9,7 +9,7 @@ const GoogleAuth: FC<TGoogleAuthProps> = () => {
     <button
       className="btn bg-white text-black border-[#e5e5e5]"
       onClick={() =>
-        (window.location.href = "http://localhost:8000/auth/google/login")
+        (window.location.href = `${import.meta.env.VITE_API_URL}/auth/google/login`)
       }
     >
       <svg
