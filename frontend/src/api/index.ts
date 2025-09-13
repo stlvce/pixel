@@ -7,14 +7,6 @@ export default class RequestAPI {
     return fetch(API_URL + "/board");
   }
 
-  static async authGoogle(token: string) {
-    return fetch(API_URL + "/auth/google", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    });
-  }
-
   static openSocket(token: string | null) {
     const anonId = getAnonId();
 

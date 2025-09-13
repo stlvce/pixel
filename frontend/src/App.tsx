@@ -276,7 +276,7 @@ const App = () => {
               width: scale,
               height: scale,
               boxSizing: "border-box",
-              border: `2px solid ${color}`,
+              border: `2px solid black`,
               pointerEvents: "none",
             }}
           />

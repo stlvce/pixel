@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useEffect } from "react";
 
 import GoogleAuth from "@src/libs/google-auth";
 import { AuthContext } from "@src/store";
@@ -21,11 +21,44 @@ const AuthModal = () => {
     localStorage.removeItem("jwt");
   };
 
+  useEffect(() => {
+    const queryParams = new URLSearchParams(window.location.search);
+    const token = queryParams.get("token");
+    if (token) {
+      setToken(token);
+      localStorage.setItem("jwt", token);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [setToken]);
+
   if (token) {
     return (
-      <button className="btn fixed z-10 right-5 top-5" onClick={handleLogout}>
-        Выйти
-      </button>
+      <div className="dropdown dropdown-end fixed z-10 right-5 top-5">
+        <div
+          className="avatar avatar-placeholder cursor-pointer"
+          tabIndex={0}
+          role="button"
+        >
+          <div className="bg-neutral text-neutral-content w-10 rounded-full">
+            <span className="text-xl">D</span>
+          </div>
+        </div>
+
+        <ul
+          tabIndex={0}
+          className="dropdown-content menu bg-base-300 rounded-box z-1 w-52 p-5 shadow-sm mt-2"
+        >
+          <li className="mb-5">username</li>
+          <li>
+            <button
+              className="btn btn-outline btn-error"
+              onClick={handleLogout}
+            >
+              Выйти
+            </button>
+          </li>
+        </ul>
+      </div>
     );
   }
 
@@ -42,7 +75,7 @@ const AuthModal = () => {
             </button>
           </form>
           <h3 className="font-bold text-lg">Вход</h3>
-          <div className="p-5">
+          <div className="pt-5">
             <GoogleAuth onSuccess={setToken} />
           </div>
         </div>

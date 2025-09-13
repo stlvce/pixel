@@ -7,7 +7,7 @@ const SideBar = ({
 }) => {
   return (
     <div className="fixed z-10 left-5 bottom-5">
-      <div className="bg-white p-1 rounded-lg shadow-xl/10 border-1 border-gray-200">
+      <div className="bg-base-200 rounded-box p-1 shadow-xl/10">
         <input
           className="w-10 h-10"
           type="color"
