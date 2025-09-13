@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from "react";
+import type {
+  WheelEventHandler,
+  MouseEventHandler,
+  TouchEventHandler,
+} from "react";
 
 import { SideBar, AuthModal, PaintPopup } from "@src/components";
 import RequestAPI from "@src/api";
-import { BOARD_WIDTH, BOARD_HEIGHT } from "./constants";
+import { BOARD_WIDTH, BOARD_HEIGHT } from "@src/constants";
 
 const App = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -16,7 +21,16 @@ const App = () => {
 
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
-  const [lastMouse, setLastMouse] = useState(null);
+  const [lastMouse, setLastMouse] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const pinchRef = useRef<{
+    startDist: number;
+    startScale: number;
+    midPoint: { x: number; y: number };
+  } | null>(null);
 
   const [hoverPixel, setHoverPixel] = useState<{
     x: number;
@@ -33,51 +47,23 @@ const App = () => {
 
   const [color, setColor] = useState("#ff0000");
 
-  useEffect(() => {
-    const token = localStorage.getItem("jwt");
-    const socket = RequestAPI.openSocket(token);
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log(data);
-      if (data.type === "init") {
-        // отрисовать всю доску
-        if (!canvasRef.current) return;
+  const clickThreshold = 5; // макс. расстояние (px), чтобы считалось кликом
+  const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
-        const ctx = canvasRef.current.getContext("2d");
+  const drawPixel = (x: number, y: number, color: string) => {
+    if (!canvasRef.current) return;
 
-        if (!ctx) return;
-
-        data.board.forEach((row, y) => {
-          row.forEach((color, x) => {
-            if (color) {
-              ctx.fillStyle = color;
-              ctx.fillRect(x, y, 1, 1);
-            }
-          });
-        });
-      } else if (data.type === "pixel") {
-        drawPixel(data.x, data.y, data.color);
-      } else if (data.type === "error") {
-        alert(data.error);
-      }
-    };
-    setWs(socket);
-
-    // белый фон
     const ctx = canvasRef.current.getContext("2d");
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
-  }, []);
 
-  const drawPixel = (x, y, color) => {
-    const ctx = canvasRef.current.getContext("2d");
+    if (!ctx) return;
+
     ctx.fillStyle = color;
     ctx.fillRect(x, y, 1, 1);
   };
 
   // подтверждение постановки
   const handlePlacePixel = () => {
-    if (!selectedPixel) return;
+    if (!selectedPixel || !ws) return;
     if (cooldown > 0) {
       alert(`Подожди ${cooldown} сек`);
       return;
@@ -90,20 +76,10 @@ const App = () => {
     setSelectedPixel(null);
   };
 
-  // кулдаун
-  useEffect(() => {
-    if (cooldown > 0) {
-      const timer = setInterval(() => {
-        setCooldown((c) => (c > 0 ? c - 1 : 0));
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [cooldown]);
-
   // зум относительно курсора
-  const handleWheel = (e) => {
+  const handleWheel: WheelEventHandler<HTMLDivElement> = (e) => {
     // e.preventDefault();
-
+    if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
@@ -121,23 +97,8 @@ const App = () => {
     setOffset({ x: newOffsetX, y: newOffsetY });
   };
 
-  // плавный зум
-  useEffect(() => {
-    let animation;
-    const animate = () => {
-      setScale((s) => {
-        const diff = targetScale - s;
-        if (Math.abs(diff) < 0.01) return targetScale;
-        return s + diff * 0.15;
-      });
-      animation = requestAnimationFrame(animate);
-    };
-    animate();
-    return () => cancelAnimationFrame(animation);
-  }, [targetScale]);
-
   // движение мыши
-  const handleMouseMove = (e) => {
+  const handleMouseMove: MouseEventHandler<HTMLDivElement> = (e) => {
     if (dragging && lastMouse) {
       const dx = e.clientX - lastMouse.x;
       const dy = e.clientY - lastMouse.y;
@@ -148,6 +109,7 @@ const App = () => {
       // сохраняем скорость
       velocity.current = { x: dx, y: dy };
     } else {
+      if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const x = Math.floor((e.clientX - rect.left - offset.x) / scale);
       const y = Math.floor((e.clientY - rect.top - offset.y) / scale);
@@ -159,22 +121,45 @@ const App = () => {
     }
   };
 
-  const clickThreshold = 5; // макс. расстояние (px), чтобы считалось кликом
-  const mouseDownPos = useRef(null);
-
-  const handleMouseDown = (e) => {
+  const handleMouseDown: MouseEventHandler<HTMLDivElement> = (e) => {
     if (e.button === 0) {
       setDragging(true);
       setLastMouse({ x: e.clientX, y: e.clientY });
       mouseDownPos.current = { x: e.clientX, y: e.clientY };
 
       // останавливаем инерцию
-      cancelAnimationFrame(animationRef.current);
-      velocity.current = { x: 0, y: 0 };
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        velocity.current = { x: 0, y: 0 };
+      }
     }
   };
 
-  const handleMouseUp = (e) => {
+  const handleTouchStart: TouchEventHandler<HTMLDivElement> = (e) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      setDragging(true);
+      setLastMouse({ x: touch.clientX, y: touch.clientY });
+      mouseDownPos.current = { x: touch.clientX, y: touch.clientY };
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        velocity.current = { x: 0, y: 0 };
+      }
+    } else if (e.touches.length === 2) {
+      // сохраняем начальное расстояние для pinch-зум
+      const [t1, t2] = [e.touches[0], e.touches[1]];
+      pinchRef.current = {
+        startDist: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY),
+        startScale: targetScale,
+        midPoint: {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2,
+        },
+      };
+    }
+  };
+
+  const handleMouseUp: MouseEventHandler<HTMLDivElement> = (e) => {
     setDragging(false);
     setLastMouse(null);
 
@@ -185,6 +170,7 @@ const App = () => {
       const dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist < clickThreshold) {
+        if (!containerRef.current) return;
         // вместо мгновенной постановки → выбор пикселя
         const rect = containerRef.current.getBoundingClientRect();
         const x = Math.floor((e.clientX - rect.left - offset.x) / scale);
@@ -219,18 +205,144 @@ const App = () => {
     animationRef.current = requestAnimationFrame(animateInertia);
   };
 
-  useEffect(() => {
-    RequestAPI.getBoard()
-      .then((res) => res.json())
-      .then((data) => {
-        const ctx = canvasRef.current.getContext("2d");
-        // ctx.clearRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+  const handleTouchMove: TouchEventHandler<HTMLDivElement> = (e) => {
+    if (e.touches.length === 1 && dragging && lastMouse) {
+      const touch = e.touches[0];
+      const dx = touch.clientX - lastMouse.x;
+      const dy = touch.clientY - lastMouse.y;
+      setOffset((o) => ({ x: o.x + dx, y: o.y + dy }));
+      setLastMouse({ x: touch.clientX, y: touch.clientY });
+      velocity.current = { x: dx, y: dy };
+    } else if (e.touches.length === 2 && pinchRef.current) {
+      const [t1, t2] = [e.touches[0], e.touches[1]];
+      const newDist = Math.hypot(
+        t2.clientX - t1.clientX,
+        t2.clientY - t1.clientY,
+      );
+      const scaleFactor = newDist / pinchRef.current.startDist;
+      const newTarget = Math.max(
+        5,
+        Math.min(50, pinchRef.current.startScale * scaleFactor),
+      );
 
-        data.forEach((pixel) => {
-          ctx.fillStyle = pixel.color;
-          ctx.fillRect(pixel.x, pixel.y, 1, 1);
-        });
+      const worldX = (pinchRef.current.midPoint.x - offset.x) / scale;
+      const worldY = (pinchRef.current.midPoint.y - offset.y) / scale;
+
+      setTargetScale(newTarget);
+      setOffset({
+        x: pinchRef.current.midPoint.x - worldX * newTarget,
+        y: pinchRef.current.midPoint.y - worldY * newTarget,
       });
+    }
+  };
+
+  const handleTouchEnd: TouchEventHandler<HTMLDivElement> = (e) => {
+    setDragging(false);
+    setLastMouse(null);
+    pinchRef.current = null;
+
+    if (e.changedTouches.length === 1 && mouseDownPos.current) {
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - mouseDownPos.current.x;
+      const dy = touch.clientY - mouseDownPos.current.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist < clickThreshold) {
+        if (!containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const x = Math.floor((touch.clientX - rect.left - offset.x) / scale);
+        const y = Math.floor((touch.clientY - rect.top - offset.y) / scale);
+        if (x >= 0 && y >= 0 && x < BOARD_WIDTH && y < BOARD_HEIGHT) {
+          setSelectedPixel({ x, y });
+        }
+      }
+    }
+
+    // инерция
+    const friction = 0.9;
+    const animateInertia = () => {
+      velocity.current.x *= friction;
+      velocity.current.y *= friction;
+
+      if (
+        Math.abs(velocity.current.x) < 0.5 &&
+        Math.abs(velocity.current.y) < 0.5
+      )
+        return;
+
+      setOffset((o) => ({
+        x: o.x + velocity.current.x,
+        y: o.y + velocity.current.y,
+      }));
+      animationRef.current = requestAnimationFrame(animateInertia);
+    };
+    animationRef.current = requestAnimationFrame(animateInertia);
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("jwt");
+    const socket = RequestAPI.openSocket(token);
+    socket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+
+      if (data.type === "pixel") {
+        drawPixel(data.x, data.y, data.color);
+      } else if (data.type === "error") {
+        alert(data.error);
+      }
+    };
+    setWs(socket);
+
+    // белый фон
+    if (!canvasRef.current) return;
+
+    const ctx = canvasRef.current.getContext("2d");
+
+    if (!ctx) return;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+  }, []);
+
+  // кулдаун
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setInterval(() => {
+        setCooldown((c) => (c > 0 ? c - 1 : 0));
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [cooldown]);
+
+  // плавный зум
+  useEffect(() => {
+    let animation: number;
+    const animate = () => {
+      setScale((s) => {
+        const diff = targetScale - s;
+        if (Math.abs(diff) < 0.01) return targetScale;
+        return s + diff * 0.15;
+      });
+      animation = requestAnimationFrame(animate);
+    };
+    animate();
+    return () => cancelAnimationFrame(animation);
+  }, [targetScale]);
+
+  useEffect(() => {
+    RequestAPI.getBoard().then((data) => {
+      if (!canvasRef.current) return;
+
+      const ctx = canvasRef.current.getContext("2d");
+      // ctx.clearRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+
+      if (!ctx) return;
+
+      data.forEach((pixel) => {
+        ctx.fillStyle = pixel.color;
+        ctx.fillRect(pixel.x, pixel.y, 1, 1);
+      });
+    });
   }, []);
 
   return (
@@ -244,6 +356,9 @@ const App = () => {
         onMouseMove={handleMouseMove}
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         ref={containerRef}
       >
         <canvas
@@ -292,14 +407,12 @@ const App = () => {
       </div>
 
       {/* Панель управления */}
-      {selectedPixel && (
-        <PaintPopup
-          selectedPixel={selectedPixel}
-          handlePlacePixel={handlePlacePixel}
-          cooldown={cooldown}
-          onCancel={() => setSelectedPixel(null)}
-        />
-      )}
+      <PaintPopup
+        selectedPixel={selectedPixel}
+        handlePlacePixel={handlePlacePixel}
+        cooldown={cooldown}
+        onCancel={() => setSelectedPixel(null)}
+      />
     </div>
   );
 };

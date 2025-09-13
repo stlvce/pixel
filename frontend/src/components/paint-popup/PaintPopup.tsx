@@ -4,7 +4,7 @@ import { useContext } from "react";
 import { AuthContext } from "@src/store";
 
 type TPaintPopupProps = {
-  selectedPixel: { x: number; y: number };
+  selectedPixel: { x: number; y: number } | null;
   handlePlacePixel: () => void;
   onCancel: () => void;
   cooldown: number;
@@ -33,6 +33,8 @@ const PaintPopup: FC<TPaintPopupProps> = ({
 
     handlePlacePixel();
   };
+
+  if (!selectedPixel) return null;
 
   return (
     <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white px-5 py-2.5 rounded-lg shadow-xl/10 border-1 border-gray-200">
