@@ -125,7 +125,7 @@ async def google_callback(request: Request, code: str, db: Session = Depends(get
         )
 
         # Редирект на фронт с токеном
-        redirect_url = f"http://localhost:5173?token={my_token}"
+        redirect_url = f"{app_settings.URL}?token={my_token}"
         return RedirectResponse(redirect_url)
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid Google token")
