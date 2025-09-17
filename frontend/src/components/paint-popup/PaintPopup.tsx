@@ -37,7 +37,7 @@ const PaintPopup: FC<TPaintPopupProps> = ({
   if (!selectedPixel) return null;
 
   return (
-    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white px-5 py-2.5 rounded-lg shadow-xl/10 border-1 border-gray-200 w-65">
+    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white px-5 py-2.5 rounded-lg shadow-xl/10 border-1 border-gray-200 w-70">
       <p className="text-zinc-800">
         Пиксель: {selectedPixel.x}, {selectedPixel.y}
       </p>

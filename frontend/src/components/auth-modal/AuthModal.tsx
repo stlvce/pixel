@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect, useCallback } from "react";
 
 import GoogleAuth from "@src/libs/google-auth";
 import { AuthContext } from "@src/store";
@@ -19,10 +19,10 @@ const AuthModal = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     setToken(null);
     localStorage.removeItem("jwt");
-  };
+  }, [setToken]);
 
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
@@ -37,10 +37,12 @@ const AuthModal = () => {
   useEffect(() => {
     if (!token) return;
 
-    RequestAPI.getMe(token).then((res) => {
-      setUser(res);
-    });
-  }, [token]);
+    RequestAPI.getMe(token)
+      .then((res) => {
+        setUser(res);
+      })
+      .catch(handleLogout);
+  }, [token, handleLogout]);
 
   if (token) {
     return (

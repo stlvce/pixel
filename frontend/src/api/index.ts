@@ -29,6 +29,12 @@ export default class RequestAPI {
   }
 
   static async getMe(token: string): Promise<TUser> {
-    return fetch(API_URL + "/me" + `?token=${token}`).then((res) => res.json());
+    const res = fetch(API_URL + "/me" + `?token=${token}`);
+
+    return res.then((res) => {
+      if (!res.ok) return Promise.reject(res);
+
+      return res.json();
+    });
   }
 }
