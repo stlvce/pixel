@@ -20,6 +20,7 @@ const App = () => {
   const [targetScale, setTargetScale] = useState(20);
 
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [targetOffset, setTargetOffset] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [lastMouse, setLastMouse] = useState<{
     x: number;
@@ -87,14 +88,9 @@ const App = () => {
     const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
     const newTarget = Math.max(5, Math.min(50, targetScale * zoomFactor));
 
-    const worldX = (mouseX - offset.x) / scale;
-    const worldY = (mouseY - offset.y) / scale;
-
+    const newOffset = zoomAtPoint(scale, newTarget, mouseX, mouseY, offset);
     setTargetScale(newTarget);
-
-    const newOffsetX = mouseX - worldX * newTarget;
-    const newOffsetY = mouseY - worldY * newTarget;
-    setOffset({ x: newOffsetX, y: newOffsetY });
+    setTargetOffset(newOffset);
   };
 
   // движение мыши
@@ -103,10 +99,12 @@ const App = () => {
       const dx = e.clientX - lastMouse.x;
       const dy = e.clientY - lastMouse.y;
 
-      setOffset((o) => ({ x: o.x + dx, y: o.y + dy }));
+      setOffset((o) => {
+        const newOffset = { x: o.x + dx, y: o.y + dy };
+        setTargetOffset(newOffset); // синхронизируем
+        return newOffset;
+      });
       setLastMouse({ x: e.clientX, y: e.clientY });
-
-      // сохраняем скорость
       velocity.current = { x: dx, y: dy };
     } else {
       if (!containerRef.current) return;
@@ -141,12 +139,12 @@ const App = () => {
       setDragging(true);
       setLastMouse({ x: touch.clientX, y: touch.clientY });
       mouseDownPos.current = { x: touch.clientX, y: touch.clientY };
+
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
         velocity.current = { x: 0, y: 0 };
       }
     } else if (e.touches.length === 2) {
-      // сохраняем начальное расстояние для pinch-зум
       const [t1, t2] = [e.touches[0], e.touches[1]];
       pinchRef.current = {
         startDist: Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY),
@@ -194,10 +192,14 @@ const App = () => {
         return;
       }
 
-      setOffset((o) => ({
-        x: o.x + velocity.current.x,
-        y: o.y + velocity.current.y,
-      }));
+      setOffset((o) => {
+        const newOffset = {
+          x: o.x + velocity.current.x,
+          y: o.y + velocity.current.y,
+        };
+        setTargetOffset(newOffset);
+        return newOffset;
+      });
 
       animationRef.current = requestAnimationFrame(animateInertia);
     };
@@ -206,13 +208,17 @@ const App = () => {
   };
 
   const handleTouchMove: TouchEventHandler<HTMLDivElement> = (e) => {
-    // e.preventDefault();
-
     if (e.touches.length === 1 && dragging && lastMouse) {
       const touch = e.touches[0];
       const dx = touch.clientX - lastMouse.x;
       const dy = touch.clientY - lastMouse.y;
-      setOffset((o) => ({ x: o.x + dx, y: o.y + dy }));
+
+      setOffset((o) => {
+        const newOffset = { x: o.x + dx, y: o.y + dy };
+        setTargetOffset(newOffset); // синхронизируем
+        return newOffset;
+      });
+
       setLastMouse({ x: touch.clientX, y: touch.clientY });
       velocity.current = { x: dx, y: dy };
     } else if (e.touches.length === 2 && pinchRef.current) {
@@ -227,14 +233,16 @@ const App = () => {
         Math.min(50, pinchRef.current.startScale * scaleFactor),
       );
 
-      const worldX = (pinchRef.current.midPoint.x - offset.x) / scale;
-      const worldY = (pinchRef.current.midPoint.y - offset.y) / scale;
+      const { x, y } = zoomAtPoint(
+        scale,
+        newTarget,
+        pinchRef.current.midPoint.x,
+        pinchRef.current.midPoint.y,
+        offset,
+      );
 
       setTargetScale(newTarget);
-      setOffset({
-        x: pinchRef.current.midPoint.x - worldX * newTarget,
-        y: pinchRef.current.midPoint.y - worldY * newTarget,
-      });
+      setTargetOffset({ x, y }); // плавный сдвиг
     }
   };
 
@@ -272,10 +280,15 @@ const App = () => {
       )
         return;
 
-      setOffset((o) => ({
-        x: o.x + velocity.current.x,
-        y: o.y + velocity.current.y,
-      }));
+      setOffset((o) => {
+        const newOffset = {
+          x: o.x + velocity.current.x,
+          y: o.y + velocity.current.y,
+        };
+        setTargetOffset(newOffset);
+        return newOffset;
+      });
+
       animationRef.current = requestAnimationFrame(animateInertia);
     };
     animationRef.current = requestAnimationFrame(animateInertia);
@@ -324,14 +337,23 @@ const App = () => {
     const animate = () => {
       setScale((s) => {
         const diff = targetScale - s;
-        if (Math.abs(diff) < 0.01) return targetScale;
-        return s + diff * 0.15;
+        return Math.abs(diff) < 0.01 ? targetScale : s + diff * 0.1;
       });
+
+      setOffset((o) => {
+        const dx = targetOffset.x - o.x;
+        const dy = targetOffset.y - o.y;
+        return {
+          x: Math.abs(dx) < 0.5 ? targetOffset.x : o.x + dx * 0.1,
+          y: Math.abs(dy) < 0.5 ? targetOffset.y : o.y + dy * 0.1,
+        };
+      });
+
       animation = requestAnimationFrame(animate);
     };
     animate();
     return () => cancelAnimationFrame(animation);
-  }, [targetScale]);
+  }, [targetScale, targetOffset]);
 
   useEffect(() => {
     RequestAPI.getBoard().then((data) => {
@@ -421,5 +443,20 @@ const App = () => {
     </div>
   );
 };
+
+function zoomAtPoint(
+  oldScale: number,
+  newScale: number,
+  pointX: number,
+  pointY: number,
+  offset: { x: number; y: number },
+) {
+  const scaleFactor = newScale / oldScale;
+
+  return {
+    x: pointX - (pointX - offset.x) * scaleFactor,
+    y: pointY - (pointY - offset.y) * scaleFactor,
+  };
+}
 
 export default App;
