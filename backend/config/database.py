@@ -1,22 +1,28 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
-DATABASE_URL = "sqlite:///./app.db"  # можно заменить на PostgreSQL/MySQL
-
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},  # для SQLite
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    AsyncSession,
 )
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+from .settings import db_settings
+
+
+engine = create_async_engine(db_settings.db_url, echo=True, future=True)
+
+async_session = sessionmaker(
+    bind=engine,
+    expire_on_commit=False,
+    class_=AsyncSession,
+)
+
 
 Base = declarative_base()
 
 
 # Dependency для FastAPI
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db():
+    async with async_session() as session:
+        try:
+            yield session
+        finally:
+            await session.close()

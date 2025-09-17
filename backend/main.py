@@ -13,12 +13,13 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from jose import jwt
 import time
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from datetime import datetime, timedelta
 import uuid
 import httpx
 
-from config.database import SessionLocal, Base, get_db, engine
+from config.database import async_session, Base, get_db, engine
 from config.settings import app_settings, google_settings
 from models import User, Pixel
 from ws_manager import ConnectionManager
@@ -57,9 +58,14 @@ clients = set()
 cooldowns = {}
 
 
-Base.metadata.create_all(bind=engine)
-
 manager = ConnectionManager()
+
+
+@app.on_event("startup")
+async def on_startup():
+    # создаём таблицы асинхронно
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 @app.get("/auth/google/login")
@@ -75,7 +81,9 @@ def google_login():
 
 
 @app.get("/auth/google/callback")
-async def google_callback(request: Request, code: str, db: Session = Depends(get_db)):
+async def google_callback(
+    request: Request, code: str, db: AsyncSession = Depends(get_db)
+):
     token_url = "https://oauth2.googleapis.com/token"
     data = {
         "code": code,
@@ -102,12 +110,14 @@ async def google_callback(request: Request, code: str, db: Session = Depends(get
         email = idinfo["email"]
 
         # Проверяем или создаем пользователя
-        user = db.query(User).filter(User.google_id == google_id).first()
+        result = await db.execute(select(User).filter_by(google_id=google_id))
+        user = result.scalar_one_or_none()
+
         if not user:
             user = User(google_id=google_id, email=email)
             db.add(user)
-            db.commit()
-            db.refresh(user)
+            await db.commit()
+            await db.refresh(user)
 
         # Генерируем собственный JWT
         payload = {
@@ -176,7 +186,7 @@ async def websocket_endpoint(
     else:
         await manager.send_to_user(conn_key, {"type": "init", "coldown": 0})
 
-    db: Session = SessionLocal()
+    db = async_session()
     try:
         while True:
             data = await websocket.receive_json()
@@ -196,13 +206,13 @@ async def websocket_endpoint(
 
             # если аноним — можно не сохранять user_id, либо сохранять anon_id в Pixel. Например:
             if is_authenticated:
-                pixel = Pixel(x=x, y=y, color=color, user_id=user_id)
+                pixel = Pixel(x=x, y=y, color=color, user_id=int(user_id))
             else:
                 pixel = Pixel(
                     x=x, y=y, color=color, anon_id=anon_id
                 )  # добавь поле anon_id в модели, если нужно
             db.add(pixel)
-            db.commit()
+            await db.commit()
 
             cooldowns[actor] = now
 
@@ -211,40 +221,39 @@ async def websocket_endpoint(
             )
     except WebSocketDisconnect:
         manager.disconnect(conn_key, websocket)
-    finally:
-        db.close()
 
 
 @app.get("/board")
-def get_board(db: Session = Depends(get_db)):
-    pixels = db.query(Pixel).join(User).all()
-    return JSONResponse(
-        content=[
-            {"x": p.x, "y": p.y, "color": p.color, "user": p.user.email} for p in pixels
-        ]
-    )
+async def get_board(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Pixel, User).join(User, Pixel.user_id == User.id))
+    pixels = result.all()
+    return [
+        {"x": p.Pixel.x, "y": p.Pixel.y, "color": p.Pixel.color, "user": p.User.email}
+        for p in pixels
+    ]
 
 
 @app.delete("/moderation/delete_pixel")
-def delete_pixel(
+async def delete_pixel(
     x: int,
     y: int,
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     if user.is_admin != 1:
         raise HTTPException(status_code=403, detail="Not enough rights")
 
-    pixel = db.query(Pixel).filter(Pixel.x == x, Pixel.y == y).first()
+    result = await db.execute(select(Pixel).filter_by(x=x, y=y))
+    pixel = result.scalar_one_or_none()
     if not pixel:
         raise HTTPException(status_code=404, detail="Pixel not found")
 
-    db.delete(pixel)
-    db.commit()
+    await db.delete(pixel)
+    await db.commit()
 
     return {"status": "deleted", "x": x, "y": y}
 
 
 @app.get("/me")
-def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_me(user: User = Depends(get_current_user)):
     return user

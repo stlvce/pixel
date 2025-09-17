@@ -24,5 +24,19 @@ class GoogleSettings(Settings):
     JWT_SECRET: str
 
 
+class DatabaseSettings(Settings):
+    model_config = SettingsConfigDict(env_prefix="DB_")
+
+    HOST: str
+    USER: str
+    PASSWORD: str
+    DB: str
+
+    @property
+    def db_url(self):
+        return f"postgresql+asyncpg://{self.USER}:{self.PASSWORD}@{self.HOST}/{self.DB}"
+
+
 app_settings = AppSettings()
 google_settings = GoogleSettings()
+db_settings = DatabaseSettings()
