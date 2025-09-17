@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type {
   WheelEventHandler,
   MouseEventHandler,
@@ -7,7 +7,7 @@ import type {
 
 import { SideBar, AuthModal, PaintPopup } from "@src/components";
 import RequestAPI from "@src/api";
-import { BOARD_WIDTH, BOARD_HEIGHT } from "@src/constants";
+import { BOARD_WIDTH, BOARD_HEIGHT, BG_WIDTH, BG_HEIGHT } from "@src/constants";
 
 const App = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -380,12 +380,93 @@ const App = () => {
       if (!ctx) return;
 
       // рисуем картинку по центру
-      const x = (BOARD_WIDTH - 100) / 2;
-      const y = (BOARD_HEIGHT - 100) / 2;
+      const x = (BOARD_WIDTH - BG_WIDTH) / 2;
+      const y = (BOARD_HEIGHT - BG_HEIGHT) / 2;
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, x, y, 100, 100);
+      ctx.drawImage(img, x, y, BG_WIDTH, BG_HEIGHT);
     };
   }, []);
+
+  const handleControl = useCallback(
+    (action: "up" | "down" | "left" | "right" | "zoomIn" | "zoomOut") => {
+      if (!selectedPixel) {
+        setSelectedPixel({ x: 0, y: 0 });
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          const newOffset = {
+            x: rect.width / 2 - 0 * scale,
+            y: rect.height / 2 - 0 * scale,
+          };
+          setOffset(newOffset);
+          setTargetOffset(newOffset);
+        }
+        return;
+      }
+
+      let { x, y } = selectedPixel;
+
+      if (action === "up") y = Math.max(0, y - 1);
+      if (action === "down") y = Math.min(BOARD_HEIGHT - 1, y + 1);
+      if (action === "left") x = Math.max(0, x - 1);
+      if (action === "right") x = Math.min(BOARD_WIDTH - 1, x + 1);
+
+      if (["up", "down", "left", "right"].includes(action)) {
+        setSelectedPixel({ x, y });
+
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          const pixelScreenX = offset.x + x * scale;
+          const pixelScreenY = offset.y + y * scale;
+
+          const newOffset = { ...offset };
+          if (pixelScreenX < 0) newOffset.x += rect.width / 4;
+          if (pixelScreenX > rect.width - scale) newOffset.x -= rect.width / 4;
+          if (pixelScreenY < 0) newOffset.y += rect.height / 4;
+          if (pixelScreenY > rect.height - scale)
+            newOffset.y -= rect.height / 4;
+
+          setOffset(newOffset);
+          setTargetOffset(newOffset);
+        }
+      }
+
+      if (action === "zoomIn" || action === "zoomOut") {
+        const zoomFactor = action === "zoomIn" ? 1.1 : 0.9;
+        const newTarget = Math.max(5, Math.min(50, targetScale * zoomFactor));
+
+        const centerX = offset.x + selectedPixel.x * scale;
+        const centerY = offset.y + selectedPixel.y * scale;
+
+        const newOffset = zoomAtPoint(
+          scale,
+          newTarget,
+          centerX,
+          centerY,
+          offset,
+        );
+
+        setTargetScale(newTarget);
+        setTargetOffset(newOffset);
+      }
+    },
+    [selectedPixel, offset, scale, targetScale],
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowUp") handleControl("up");
+      if (e.key === "ArrowDown") handleControl("down");
+      if (e.key === "ArrowLeft") handleControl("left");
+      if (e.key === "ArrowRight") handleControl("right");
+      if (e.key.toLowerCase() === "w" || e.key.toLowerCase() === "ц")
+        handleControl("zoomOut");
+      if (e.key.toLowerCase() === "q" || e.key.toLowerCase() === "й")
+        handleControl("zoomIn");
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleControl]);
 
   return (
     <div className="App">
@@ -456,6 +537,44 @@ const App = () => {
         cooldown={cooldown}
         onCancel={() => setSelectedPixel(null)}
       />
+
+      {/* Кнопки управления */}
+      <div className="absolute left-5 bottom-5 flex flex-col gap-2 select-none">
+        <div className="flex justify-center gap-5">
+          <div className="relative">
+            <button
+              className="btn w-10"
+              onClick={() => handleControl("zoomIn")}
+            >
+              +
+            </button>
+            <kbd className="kbd kbd-xs absolute -top-1 -right-1">Q</kbd>
+          </div>
+          <button className="btn w-10" onClick={() => handleControl("up")}>
+            ▲
+          </button>
+          <div className="relative">
+            <button
+              className="btn w-10"
+              onClick={() => handleControl("zoomOut")}
+            >
+              -
+            </button>
+            <kbd className="kbd kbd-xs absolute -top-1 -right-1">W</kbd>
+          </div>
+        </div>
+        <div className="flex justify-center gap-5">
+          <button className="btn w-10" onClick={() => handleControl("left")}>
+            ◀︎
+          </button>
+          <button className="btn w-10" onClick={() => handleControl("down")}>
+            ▼
+          </button>
+          <button className="btn w-10" onClick={() => handleControl("right")}>
+            ▶︎
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
