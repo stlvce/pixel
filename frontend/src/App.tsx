@@ -291,6 +291,8 @@ const App = () => {
         drawPixel(data.x, data.y, data.color);
       } else if (data.type === "error") {
         alert(data.error);
+      } else if (data.type === "init") {
+        setCooldown(data.coldown);
       }
     };
     setWs(socket);

@@ -76,7 +76,6 @@ def google_login():
 
 @app.get("/auth/google/callback")
 async def google_callback(request: Request, code: str, db: Session = Depends(get_db)):
-    print(code)
     token_url = "https://oauth2.googleapis.com/token"
     data = {
         "code": code,
@@ -168,6 +167,15 @@ async def websocket_endpoint(
     conn_key = f"user:{user_id}" if is_authenticated else f"anon:{anon_id}"
     await manager.connect(conn_key, websocket)
 
+    last_time = cooldowns.get(conn_key, 0)
+    now = time.time()
+    if now - last_time < 60:
+        await manager.send_to_user(
+            conn_key, {"type": "init", "coldown": 60 - round(now - last_time)}
+        )
+    else:
+        await manager.send_to_user(conn_key, {"type": "init", "coldown": 0})
+
     db: Session = SessionLocal()
     try:
         while True:
@@ -210,7 +218,6 @@ async def websocket_endpoint(
 @app.get("/board")
 def get_board(db: Session = Depends(get_db)):
     pixels = db.query(Pixel).join(User).all()
-    print(pixels)
     return JSONResponse(
         content=[
             {"x": p.x, "y": p.y, "color": p.color, "user": p.user.email} for p in pixels
