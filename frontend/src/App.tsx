@@ -539,7 +539,7 @@ const App = () => {
       />
 
       {/* Кнопки управления */}
-      <div className="absolute left-5 bottom-5 flex flex-col gap-2 select-none">
+      <div className="absolute left-5 bottom-5 flex flex-col gap-2 select-none hidden md:flex">
         <div className="flex justify-center gap-5">
           <div className="relative">
             <button
