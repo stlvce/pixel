@@ -371,6 +371,22 @@ const App = () => {
     });
   }, []);
 
+  useEffect(() => {
+    const img = new Image();
+    img.src = "/bg.png"; // путь к картинке
+    img.onload = () => {
+      if (!canvasRef.current) return;
+      const ctx = canvasRef.current.getContext("2d");
+      if (!ctx) return;
+
+      // рисуем картинку по центру
+      const x = (BOARD_WIDTH - 100) / 2;
+      const y = (BOARD_HEIGHT - 100) / 2;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, x, y, 100, 100);
+    };
+  }, []);
+
   return (
     <div className="App">
       <SideBar color={color} changeColor={(newColor) => setColor(newColor)} />
