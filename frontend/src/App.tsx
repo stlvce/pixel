@@ -206,7 +206,7 @@ const App = () => {
   };
 
   const handleTouchMove: TouchEventHandler<HTMLDivElement> = (e) => {
-    e.preventDefault();
+    // e.preventDefault();
 
     if (e.touches.length === 1 && dragging && lastMouse) {
       const touch = e.touches[0];
