@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useContext } from "react";
 import type {
   WheelEventHandler,
   MouseEventHandler,
@@ -8,8 +8,11 @@ import type {
 import { SideBar, AuthModal, PaintPopup } from "@src/components";
 import RequestAPI from "@src/api";
 import { BOARD_WIDTH, BOARD_HEIGHT, BG_WIDTH, BG_HEIGHT } from "@src/constants";
+import { AuthContext } from "@src/store";
 
 const App = () => {
+  const { user } = useContext(AuthContext);
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -468,6 +471,126 @@ const App = () => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleControl]);
 
+  // новое состояние
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionStart, setSelectionStart] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [selectionEnd, setSelectionEnd] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [isEdit, setIsEdit] = useState(true);
+
+  const clamp = (value: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, value));
+
+  // начало выделения
+  const handleAdminMouseDown: MouseEventHandler<HTMLDivElement> = (e) => {
+    if (user?.is_admin !== 1) return;
+    if (!containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left - offset.x) / scale);
+    const y = Math.floor((e.clientY - rect.top - offset.y) / scale);
+
+    setSelectionStart({ x, y });
+    setSelectionEnd(null);
+    setIsSelecting(true);
+  };
+
+  // тянем прямоугольник
+  const handleAdminMouseMove: MouseEventHandler<HTMLDivElement> = (e) => {
+    if (user?.is_admin !== 1 || !isSelecting || !selectionStart) return;
+    if (!containerRef.current) return;
+
+    const rect = containerRef.current.getBoundingClientRect();
+    let x = Math.floor((e.clientX - rect.left - offset.x) / scale);
+    let y = Math.floor((e.clientY - rect.top - offset.y) / scale);
+
+    // ограничиваем область канвасом
+    x = clamp(x, 0, BOARD_WIDTH - 1);
+    y = clamp(y, 0, BOARD_HEIGHT - 1);
+
+    setSelectionEnd({ x, y });
+
+    // автоскролл при достижении края экрана
+    const margin = 50;
+    let dx = 0;
+    let dy = 0;
+
+    if (e.clientX - rect.left < margin) dx = 10; // влево
+    if (rect.right - e.clientX < margin) dx = -10; // вправо
+    if (e.clientY - rect.top < margin) dy = 10; // вверх
+    if (rect.bottom - e.clientY < margin) dy = -10; // вниз
+
+    if (dx !== 0 || dy !== 0) {
+      setOffset((o) => {
+        const newOffset = { x: o.x + dx, y: o.y + dy };
+        setTargetOffset(newOffset);
+        return newOffset;
+      });
+    }
+  };
+
+  // отпускаем — очищаем
+  const handleAdminMouseUp: MouseEventHandler<HTMLDivElement> = () => {
+    if (
+      user?.is_admin !== 1 ||
+      !isSelecting ||
+      !selectionStart ||
+      !selectionEnd ||
+      !canvasRef.current
+    ) {
+      setIsSelecting(false);
+      return;
+    }
+
+    const ctx = canvasRef.current.getContext("2d");
+    if (!ctx) return;
+
+    const x1 = clamp(
+      Math.min(selectionStart.x, selectionEnd.x),
+      0,
+      BOARD_WIDTH - 1,
+    );
+    const y1 = clamp(
+      Math.min(selectionStart.y, selectionEnd.y),
+      0,
+      BOARD_HEIGHT - 1,
+    );
+    const x2 = clamp(
+      Math.max(selectionStart.x, selectionEnd.x),
+      0,
+      BOARD_WIDTH - 1,
+    );
+    const y2 = clamp(
+      Math.max(selectionStart.y, selectionEnd.y),
+      0,
+      BOARD_HEIGHT - 1,
+    );
+
+    // сообщение на сервер
+    const token = localStorage.getItem("jwt");
+
+    if (token) {
+      RequestAPI.deletePixels(token, {
+        start: { x: x1, y: y1 },
+        end: { x: x2, y: y2 },
+      }).then((res) => {
+        res.forEach((pixel) => {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(pixel.x, pixel.y, 1, 1);
+        });
+      });
+    }
+
+    setIsSelecting(false);
+    setSelectionStart(null);
+    setSelectionEnd(null);
+  };
+
   return (
     <div className="App">
       <SideBar color={color} changeColor={(newColor) => setColor(newColor)} />
@@ -476,9 +599,27 @@ const App = () => {
       <div
         className={`relative w-screen h-screen overflow-hidden ${dragging ? "cursor-grabbing" : "cursor-default"} touch-none`}
         onWheel={handleWheel}
-        onMouseMove={handleMouseMove}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
+        onMouseMove={(e) => {
+          if (isEdit) {
+            handleMouseMove(e);
+          } else {
+            handleAdminMouseMove(e);
+          }
+        }}
+        onMouseDown={(e) => {
+          if (isEdit) {
+            handleMouseDown(e);
+          } else {
+            handleAdminMouseDown(e);
+          }
+        }}
+        onMouseUp={(e) => {
+          if (isEdit) {
+            handleMouseUp(e);
+          } else {
+            handleAdminMouseUp(e);
+          }
+        }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -537,6 +678,67 @@ const App = () => {
         cooldown={cooldown}
         onCancel={() => setSelectedPixel(null)}
       />
+
+      {isSelecting && selectionStart && selectionEnd && (
+        <div
+          style={{
+            position: "absolute",
+            left: offset.x + Math.min(selectionStart.x, selectionEnd.x) * scale,
+            top: offset.y + Math.min(selectionStart.y, selectionEnd.y) * scale,
+            width: (Math.abs(selectionEnd.x - selectionStart.x) + 1) * scale,
+            height: (Math.abs(selectionEnd.y - selectionStart.y) + 1) * scale,
+            border: "2px dashed red",
+            backgroundColor: "rgba(255,0,0,0.2)",
+            pointerEvents: "none",
+          }}
+        />
+      )}
+
+      {user?.is_admin === 1 ? (
+        <label className="swap swap-rotate btn btn-circle size-15 fixed bottom-5 right-5">
+          <input
+            type="checkbox"
+            value={isEdit}
+            onChange={(e) => {
+              if (isEdit) {
+                setSelectedPixel(null);
+                setHoverPixel(null);
+              }
+
+              setIsEdit(!isEdit);
+            }}
+          />
+
+          <svg
+            className="swap-off h-10 w-10 size-5"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            strokeWidth="1.5"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
+            />
+          </svg>
+
+          <svg
+            className="swap-on h-10 w-10 size-5"
+            aria-label="New post"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+          >
+            <path
+              fillRule="evenodd"
+              d="M11.013 2.513a1.75 1.75 0 0 1 2.475 2.474L6.226 12.25a2.751 2.751 0 0 1-.892.596l-2.047.848a.75.75 0 0 1-.98-.98l.848-2.047a2.75 2.75 0 0 1 .596-.892l7.262-7.261Z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </label>
+      ) : null}
 
       {/* Кнопки управления */}
       <div className="absolute left-5 bottom-5 flex flex-col gap-2 select-none hidden md:flex">

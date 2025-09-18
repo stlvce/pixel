@@ -4,10 +4,14 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 type TPixel = { x: number; y: number; color: string; user: string };
 
+type DeletePixelsIn = {
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+};
+
 export type TUser = {
   id: number;
   is_admin: number;
-  google_id: string;
   email: string;
 };
 
@@ -36,5 +40,30 @@ export default class RequestAPI {
 
       return res.json();
     });
+  }
+
+  static async deletePixels(
+    token: string,
+    payload: DeletePixelsIn,
+  ): Promise<TPixel[]> {
+    const response = await fetch(
+      API_URL + "/moderation/delete_pixels" + `?token=${token}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        `Failed to delete pixels: ${errorData.detail || response.statusText}`,
+      );
+    }
+
+    return response.json();
   }
 }

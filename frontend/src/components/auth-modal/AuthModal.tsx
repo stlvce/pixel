@@ -1,13 +1,11 @@
-import { useState, useContext, useEffect, useCallback } from "react";
+import { useContext, useEffect } from "react";
 
 import GoogleAuth from "@src/libs/google-auth";
 import { AuthContext } from "@src/store";
 import RequestAPI from "@src/api";
-import type { TUser } from "@src/api";
 
 const AuthModal = () => {
-  const { token, setToken } = useContext(AuthContext);
-  const [user, setUser] = useState<TUser | null>(null);
+  const { token, setToken, user, setUser } = useContext(AuthContext);
 
   const openAuthModal = () => {
     const authModal = document.getElementById(
@@ -19,10 +17,10 @@ const AuthModal = () => {
     }
   };
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = () => {
     setToken(null);
     localStorage.removeItem("jwt");
-  }, [setToken]);
+  };
 
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
@@ -32,7 +30,7 @@ const AuthModal = () => {
       localStorage.setItem("jwt", token);
       window.history.replaceState(null, "", window.location.pathname);
     }
-  }, [setToken]);
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -42,7 +40,8 @@ const AuthModal = () => {
         setUser(res);
       })
       .catch(handleLogout);
-  }, [token, handleLogout]);
+    // TODO только если expire token
+  }, [token]);
 
   if (token) {
     return (

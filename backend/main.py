@@ -13,7 +13,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from jose import jwt
 import time
-from sqlalchemy import delete, tuple_
+from sqlalchemy import delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from datetime import datetime, timedelta
@@ -244,7 +244,7 @@ async def delete_pixel(
     db: AsyncSession = Depends(get_db),
 ):
     # Проверяем права
-    if user.is_admin != UserRole.ADMIN:
+    if user.is_admin != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Not enough rights")
 
     # Получение пикселя
@@ -265,15 +265,48 @@ async def delete_pixels(
     db: AsyncSession = Depends(get_db),
 ):
     # Проверяем права
-    if user.is_admin != UserRole.ADMIN:
+    if user.is_admin != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Not enough rights")
 
-    if not payload.pixels:
-        raise HTTPException(status_code=400, detail="No pixels provided")
+    # Проверяем наличие start и end
+    if not payload.start or not payload.end:
+        raise HTTPException(
+            status_code=400, detail="Start and end coordinates required"
+        )
 
-    # Удаляем несколько пикселей сразу
-    stmt = delete(Pixel).where(tuple_(Pixel.x, Pixel.y).in_(payload.pixels))
+    x_start, y_start = payload.start.x, payload.start.y
+    x_end, y_end = payload.end.x, payload.end.y
+
+    # Убедимся, что координаты корректны
+    if x_start > x_end or y_start > y_end:
+        raise HTTPException(status_code=400, detail="Invalid coordinate range")
+
+    # Получаем пиксели, которые будут удалены
+    result = await db.execute(
+        select(Pixel).where(
+            and_(
+                Pixel.x >= x_start,
+                Pixel.x <= x_end,
+                Pixel.y >= y_start,
+                Pixel.y <= y_end,
+            )
+        )
+    )
+    pixels_to_delete = result.scalars().all()
+
+    if not pixels_to_delete:
+        return []
+
+    # Формируем список для возвращения
+    deleted_pixels = [
+        {"x": p.x, "y": p.y, "color": p.color, "id": p.id} for p in pixels_to_delete
+    ]
+
+    # Удаляем пиксели из БД
+    stmt = delete(Pixel).where(
+        and_(Pixel.x >= x_start, Pixel.x <= x_end, Pixel.y >= y_start, Pixel.y <= y_end)
+    )
     await db.execute(stmt)
     await db.commit()
 
-    return {"status": "deleted", "count": len(payload.pixels)}
+    return deleted_pixels
