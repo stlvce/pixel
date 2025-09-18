@@ -785,7 +785,7 @@ const App = () => {
       )}
 
       {user?.is_admin === 1 ? (
-        <label className="swap swap-rotate btn btn-circle size-15 fixed bottom-5 right-5">
+        <label className="swap swap-rotate rounded-sm border border-gray-200 shadow-lg bg-white size-15 fixed left-2 top-20">
           <input
             type="checkbox"
             value={isEdit}
