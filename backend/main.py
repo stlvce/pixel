@@ -25,6 +25,7 @@ from config.settings import app_settings, google_settings
 from models import User, Pixel
 from ws_manager import ConnectionManager
 from security import get_current_user, verify_jwt
+from schemas import UserRole, UserOut, PixelOut
 
 
 app = FastAPI(
@@ -47,14 +48,6 @@ app.add_middleware(
 )
 
 
-# размеры поля
-WIDTH = 200
-HEIGHT = 200
-
-
-# список подключённых клиентов
-clients = set()
-
 # кулдаун для юзеров
 cooldowns = {}
 
@@ -67,6 +60,26 @@ async def on_startup():
     # создаём таблицы асинхронно
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+@app.get("/me", response_model=UserOut)
+async def get_me(user: User = Depends(get_current_user)):
+    return user
+
+
+@app.get("/board", response_model=list[PixelOut])
+async def get_board(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Pixel, User).join(User, Pixel.user_id == User.id))
+    pixels = result.all()
+    return [
+        {
+            "id": p.Pixel.id,
+            "x": p.Pixel.x,
+            "y": p.Pixel.y,
+            "color": p.Pixel.color,
+        }
+        for p in pixels
+    ]
 
 
 @app.get("/auth/google/login")
@@ -222,16 +235,6 @@ async def websocket_endpoint(
         manager.disconnect(conn_key, websocket)
 
 
-@app.get("/board")
-async def get_board(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Pixel, User).join(User, Pixel.user_id == User.id))
-    pixels = result.all()
-    return [
-        {"x": p.Pixel.x, "y": p.Pixel.y, "color": p.Pixel.color, "user": p.User.email}
-        for p in pixels
-    ]
-
-
 @app.delete("/moderation/delete_pixel")
 async def delete_pixel(
     x: int,
@@ -239,20 +242,16 @@ async def delete_pixel(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if user.is_admin != 1:
+    # Проверяем права
+    if user.is_admin != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Not enough rights")
 
+    # Получение пикселя
     result = await db.execute(select(Pixel).filter_by(x=x, y=y))
     pixel = result.scalar_one_or_none()
     if not pixel:
         raise HTTPException(status_code=404, detail="Pixel not found")
 
+    # Удаление пиксиля из БД
     await db.delete(pixel)
     await db.commit()
-
-    return {"status": "deleted", "x": x, "y": y}
-
-
-@app.get("/me")
-async def get_me(user: User = Depends(get_current_user)):
-    return user

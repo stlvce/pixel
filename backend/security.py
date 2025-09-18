@@ -22,7 +22,10 @@ def verify_jwt(token: str):
 
 async def get_current_user(token: str = Query(...), db: AsyncSession = Depends(get_db)):
     try:
+        # Проверяем токена
         payload = verify_jwt(token)
+
+        # Получение пользователя
         result = await db.execute(select(User).filter_by(id=int(payload["sub"])))
         user = result.scalar_one_or_none()
         if not user:
