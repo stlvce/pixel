@@ -18,3 +18,7 @@ class PixelOut(BaseModel):
     x: int
     y: int
     color: str
+
+
+class PixelsDeleteIn(BaseModel):
+    pixels: list[tuple[int, int]]

@@ -13,6 +13,7 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from jose import jwt
 import time
+from sqlalchemy import delete, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from datetime import datetime, timedelta
@@ -25,7 +26,7 @@ from config.settings import app_settings, google_settings
 from models import User, Pixel
 from ws_manager import ConnectionManager
 from security import get_current_user, verify_jwt
-from schemas import UserRole, UserOut, PixelOut
+from schemas import UserRole, UserOut, PixelOut, PixelsDeleteIn
 
 
 app = FastAPI(
@@ -255,3 +256,24 @@ async def delete_pixel(
     # Удаление пиксиля из БД
     await db.delete(pixel)
     await db.commit()
+
+
+@app.delete("/moderation/delete_pixels")
+async def delete_pixels(
+    payload: PixelsDeleteIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # Проверяем права
+    if user.is_admin != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Not enough rights")
+
+    if not payload.pixels:
+        raise HTTPException(status_code=400, detail="No pixels provided")
+
+    # Удаляем несколько пикселей сразу
+    stmt = delete(Pixel).where(tuple_(Pixel.x, Pixel.y).in_(payload.pixels))
+    await db.execute(stmt)
+    await db.commit()
+
+    return {"status": "deleted", "count": len(payload.pixels)}
