@@ -7,7 +7,7 @@ from fastapi import (
     Depends,
     Request,
 )
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from google.oauth2 import id_token
 from google.auth.transport import requests
@@ -18,6 +18,7 @@ from sqlalchemy.future import select
 from datetime import datetime, timedelta
 import uuid
 import httpx
+from typing import Union
 
 from config.database import async_session, Base, get_db, engine
 from config.settings import app_settings, google_settings
@@ -145,15 +146,13 @@ async def websocket_endpoint(
     websocket: WebSocket, token: str = Query(None), anon_id: str = Query(None)
 ):
     # если есть токен — верифицируем
-    user_id = None
-    user_email = None
+    user_id: Union[str, None] = None
     is_authenticated = False
 
     if token:
         try:
             user_data = verify_jwt(token)
             user_id = user_data["sub"]
-            user_email = user_data.get("email")
             is_authenticated = True
         except HTTPException:
             await websocket.close(code=1008)
@@ -186,7 +185,7 @@ async def websocket_endpoint(
     else:
         await manager.send_to_user(conn_key, {"type": "init", "coldown": 0})
 
-    db = async_session()
+    db: AsyncSession = async_session()
     try:
         while True:
             data = await websocket.receive_json()
@@ -205,7 +204,7 @@ async def websocket_endpoint(
                 continue
 
             # если аноним — можно не сохранять user_id, либо сохранять anon_id в Pixel. Например:
-            if is_authenticated:
+            if is_authenticated and user_id:
                 pixel = Pixel(x=x, y=y, color=color, user_id=int(user_id))
             else:
                 pixel = Pixel(
