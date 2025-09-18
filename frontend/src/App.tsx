@@ -591,6 +591,114 @@ const App = () => {
     setSelectionEnd(null);
   };
 
+  const handleAdminTouchStart: TouchEventHandler<HTMLDivElement> = (e) => {
+    if (user?.is_admin !== 1 || e.touches.length !== 1) return;
+    if (!containerRef.current) return;
+
+    const touch = e.touches[0];
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = Math.floor((touch.clientX - rect.left - offset.x) / scale);
+    const y = Math.floor((touch.clientY - rect.top - offset.y) / scale);
+
+    setSelectionStart({ x, y });
+    setSelectionEnd(null);
+    setIsSelecting(true);
+  };
+
+  const handleAdminTouchMove: TouchEventHandler<HTMLDivElement> = (e) => {
+    if (
+      user?.is_admin !== 1 ||
+      !isSelecting ||
+      !selectionStart ||
+      e.touches.length !== 1
+    )
+      return;
+    if (!containerRef.current) return;
+
+    const touch = e.touches[0];
+    const rect = containerRef.current.getBoundingClientRect();
+
+    let x = Math.floor((touch.clientX - rect.left - offset.x) / scale);
+    let y = Math.floor((touch.clientY - rect.top - offset.y) / scale);
+
+    x = clamp(x, 0, BOARD_WIDTH - 1);
+    y = clamp(y, 0, BOARD_HEIGHT - 1);
+
+    setSelectionEnd({ x, y });
+
+    // автоскролл при достижении края контейнера
+    const margin = 50; // px от края
+    let dx = 0;
+    let dy = 0;
+
+    if (touch.clientX - rect.left < margin) dx = 10; // движение влево
+    if (rect.right - touch.clientX < margin) dx = -10; // движение вправо
+    if (touch.clientY - rect.top < margin) dy = 10; // движение вверх
+    if (rect.bottom - touch.clientY < margin) dy = -10; // движение вниз
+
+    if (dx !== 0 || dy !== 0) {
+      setOffset((o) => {
+        const newOffset = { x: o.x + dx, y: o.y + dy };
+        setTargetOffset(newOffset); // синхронизация с плавным движением
+        return newOffset;
+      });
+    }
+  };
+
+  const handleAdminTouchEnd: TouchEventHandler<HTMLDivElement> = () => {
+    if (
+      user?.is_admin !== 1 ||
+      !isSelecting ||
+      !selectionStart ||
+      !selectionEnd
+    ) {
+      setIsSelecting(false);
+      return;
+    }
+
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+
+    const x1 = clamp(
+      Math.min(selectionStart.x, selectionEnd.x),
+      0,
+      BOARD_WIDTH - 1,
+    );
+    const y1 = clamp(
+      Math.min(selectionStart.y, selectionEnd.y),
+      0,
+      BOARD_HEIGHT - 1,
+    );
+    const x2 = clamp(
+      Math.max(selectionStart.x, selectionEnd.x),
+      0,
+      BOARD_WIDTH - 1,
+    );
+    const y2 = clamp(
+      Math.max(selectionStart.y, selectionEnd.y),
+      0,
+      BOARD_HEIGHT - 1,
+    );
+
+    // Удаляем пиксели через API
+    const token = localStorage.getItem("jwt");
+    if (token) {
+      RequestAPI.deletePixels(token, {
+        start: { x: x1, y: y1 },
+        end: { x: x2, y: y2 },
+      }).then((res) => {
+        res.forEach((pixel: { x: number; y: number }) => {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(pixel.x, pixel.y, 1, 1);
+        });
+      });
+    }
+
+    setIsSelecting(false);
+    setSelectionStart(null);
+    setSelectionEnd(null);
+  };
+
   return (
     <div className="App">
       <SideBar color={color} changeColor={(newColor) => setColor(newColor)} />
@@ -599,30 +707,12 @@ const App = () => {
       <div
         className={`relative w-screen h-screen overflow-hidden ${dragging ? "cursor-grabbing" : "cursor-default"} touch-none`}
         onWheel={handleWheel}
-        onMouseMove={(e) => {
-          if (isEdit) {
-            handleMouseMove(e);
-          } else {
-            handleAdminMouseMove(e);
-          }
-        }}
-        onMouseDown={(e) => {
-          if (isEdit) {
-            handleMouseDown(e);
-          } else {
-            handleAdminMouseDown(e);
-          }
-        }}
-        onMouseUp={(e) => {
-          if (isEdit) {
-            handleMouseUp(e);
-          } else {
-            handleAdminMouseUp(e);
-          }
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onMouseMove={isEdit ? handleMouseMove : handleAdminMouseMove}
+        onMouseDown={isEdit ? handleMouseDown : handleAdminMouseDown}
+        onMouseUp={isEdit ? handleMouseUp : handleAdminMouseUp}
+        onTouchStart={isEdit ? handleTouchStart : handleAdminTouchStart}
+        onTouchMove={isEdit ? handleTouchMove : handleAdminTouchMove}
+        onTouchEnd={isEdit ? handleTouchEnd : handleAdminTouchEnd}
         ref={containerRef}
       >
         <canvas
