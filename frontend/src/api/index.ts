@@ -28,12 +28,12 @@ export default class RequestAPI {
     else params.set("anon_id", anonId);
 
     return new WebSocket(
-      import.meta.env.VITE_API_URL_WS + "/ws?" + params.toString(),
+      import.meta.env.VITE_API_URL_WS + "/board/ws?" + params.toString(),
     );
   }
 
   static async getMe(token: string): Promise<TUser> {
-    const res = fetch(API_URL + "/me" + `?token=${token}`);
+    const res = fetch(API_URL + "/user" + `?token=${token}`);
 
     return res.then((res) => {
       if (!res.ok) return Promise.reject(res);
@@ -47,7 +47,7 @@ export default class RequestAPI {
     payload: DeletePixelsIn,
   ): Promise<TPixel[]> {
     const response = await fetch(
-      API_URL + "/moderation/delete_pixels" + `?token=${token}`,
+      API_URL + "/board/delete_pixels" + `?token=${token}`,
       {
         method: "DELETE",
         headers: {

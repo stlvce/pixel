@@ -48,14 +48,13 @@ const AuthModal = () => {
       <div className="dropdown dropdown-end fixed z-10 right-2 top-2">
         <div className="avatar indicator">
           {user?.is_admin === 1 && (
-            <span className="indicator-item indicator-bottom indicator-start">
+            <span className="indicator-item indicator-bottom indicator-start stroke-primary bg-white rounded-full p-0.5">
               <svg
                 className="size-5"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
                 strokeWidth="1.5"
-                stroke="currentColor"
               >
                 <path
                   strokeLinecap="round"
@@ -71,7 +70,7 @@ const AuthModal = () => {
             tabIndex={0}
             role="button"
           >
-            <div className="bg-neutral text-neutral-content w-12 rounded-full">
+            <div className="bg-info text-neutral-content w-12 rounded-full">
               <span className="text-xl">
                 {user?.email ? user.email.substring(0, 1).toUpperCase() : ""}
               </span>
@@ -81,14 +80,25 @@ const AuthModal = () => {
 
         <ul
           tabIndex={0}
-          className="dropdown-content menu bg-base-300 rounded-box z-1 w-52 p-5 shadow-sm mt-2"
+          className="dropdown-content menu bg-white rounded-box z-1 w-52 p-5 shadow-md mt-2 border-1 border-gray-200"
         >
-          <li className="mb-5">{user?.email}</li>
+          <li className="mb-5 color-primary font-semibold">{user?.email}</li>
           <li>
-            <button
-              className="btn btn-outline btn-error"
-              onClick={handleLogout}
-            >
+            <button className="btn btn-soft btn-error" onClick={handleLogout}>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="size-5"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M8.25 9V5.25A2.25 2.25 0 0 1 10.5 3h6a2.25 2.25 0 0 1 2.25 2.25v13.5A2.25 2.25 0 0 1 16.5 21h-6a2.25 2.25 0 0 1-2.25-2.25V15m-3 0-3-3m0 0 3-3m-3 3H15"
+                />
+              </svg>
               Выйти
             </button>
           </li>

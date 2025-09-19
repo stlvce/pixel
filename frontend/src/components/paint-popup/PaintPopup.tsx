@@ -39,26 +39,29 @@ const PaintPopup: FC<TPaintPopupProps> = ({
   if (!selectedPixel) return null;
 
   return (
-    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white px-5 py-2.5 rounded-lg shadow-xl/10 border-1 border-gray-200 w-70">
-      <div className="flex items-center gap-2">
-        <span
-          className={`w-4 h-4 mt-1 rounded-sm border border-zinc-800`}
-          style={{ backgroundColor: color }}
-        />
-        <p className="text-zinc-800">
-          Пиксель: {selectedPixel.x}, {selectedPixel.y}
-        </p>
-      </div>
-      <div className="flex mt-2 gap-3">
+    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-xl/10 border-1 border-gray-200 w-57">
+      <div className="relative pt-5 px-5 pb-3">
         <button
-          className="btn btn-primary flex-1"
+          className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2"
+          onClick={onCancel}
+        >
+          ✕
+        </button>
+        <div className="flex items-center gap-2">
+          <span
+            className={`w-4 h-4 rounded-sm border border-neutral-content`}
+            style={{ backgroundColor: color }}
+          />
+          <p className="text-zinc-800">
+            Пиксель: {selectedPixel.x}, {selectedPixel.y}
+          </p>
+        </div>
+        <button
+          className="btn btn-primary mt-3 w-full"
           onClick={handlePaint}
           disabled={cooldown > 0}
         >
           {cooldown > 0 ? `Подожди ${cooldown}с` : "Поставить"}
-        </button>
-        <button className="btn btn-neutral btn-outline" onClick={onCancel}>
-          Отмена
         </button>
       </div>
     </div>
