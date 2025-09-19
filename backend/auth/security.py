@@ -4,8 +4,8 @@ from sqlalchemy.future import select
 from jose import jwt, JWTError, ExpiredSignatureError
 
 from config.settings import app_settings
-from models import User
 from config.database import get_db
+from config.models import User
 
 
 def verify_jwt(token: str):

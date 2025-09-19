@@ -1,0 +1,92 @@
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Depends,
+    Request,
+)
+from fastapi.responses import RedirectResponse
+from google.oauth2 import id_token
+from google.auth.transport import requests
+from jose import jwt
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from datetime import datetime, timedelta
+import httpx
+
+from config.database import get_db
+from config.settings import app_settings, google_settings
+from config.models import User
+
+auth_router = APIRouter()
+
+
+@auth_router.get("/google/login")
+def google_login():
+    google_auth_url = (
+        "https://accounts.google.com/o/oauth2/v2/auth"
+        f"?client_id={google_settings.CLIENT_ID}"
+        f"&redirect_uri={app_settings.API_URL}/auth/google/callback"
+        "&response_type=code"
+        "&scope=openid%20email%20profile"
+    )
+    return RedirectResponse(google_auth_url)
+
+
+@auth_router.get("/google/callback")
+async def google_callback(
+    request: Request, code: str, db: AsyncSession = Depends(get_db)
+):
+    token_url = "https://oauth2.googleapis.com/token"
+    data = {
+        "code": code,
+        "client_id": google_settings.CLIENT_ID,
+        "client_secret": google_settings.JWT_SECRET,
+        "redirect_uri": f"{app_settings.API_URL}/auth/google/callback",
+        "grant_type": "authorization_code",
+    }
+
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(token_url, data=data)
+        token_json = token_resp.json()
+
+    id_token_str = token_json.get("id_token")
+    if not id_token_str:
+        raise HTTPException(status_code=400, detail="No ID token returned from Google")
+
+    try:
+        # Проверка Google ID токена
+        idinfo = id_token.verify_oauth2_token(
+            id_token_str, requests.Request(), google_settings.CLIENT_ID
+        )
+        google_id = idinfo["sub"]
+        email = idinfo["email"]
+
+        # Проверяем или создаем пользователя
+        result = await db.execute(select(User).filter_by(google_id=google_id))
+        user = result.scalar_one_or_none()
+
+        if not user:
+            user = User(google_id=google_id, email=email)
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+
+        # Генерируем собственный JWT
+        payload = {
+            "sub": str(user.id),
+            "email": email,
+            "exp": int(
+                (
+                    datetime.utcnow() + timedelta(days=app_settings.JWT_EXPIRE_DAYS)
+                ).timestamp()
+            ),
+        }
+        my_token = jwt.encode(
+            payload, app_settings.JWT_SECRET, algorithm=app_settings.JWT_ALG
+        )
+
+        # Редирект на фронт с токеном
+        redirect_url = f"{app_settings.URL}?token={my_token}"
+        return RedirectResponse(redirect_url)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
