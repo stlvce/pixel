@@ -41,7 +41,9 @@ const AuthModal = () => {
         setUser(res);
         setIsLoading(false);
       })
-      .catch(handleLogout);
+      .catch((err: Response) => {
+        if (err.status === 401) handleLogout();
+      });
     // TODO только если expire token
   }, [token]);
 
