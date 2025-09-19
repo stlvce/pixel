@@ -19,7 +19,7 @@ body {
 
 input[type="color"] {
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: calc(infinity * 1px);
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {
