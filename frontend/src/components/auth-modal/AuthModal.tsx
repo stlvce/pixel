@@ -19,8 +19,8 @@ const AuthModal = () => {
   };
 
   const handleLogout = () => {
-    setToken(null);
     localStorage.removeItem("jwt");
+    window.location.reload();
   };
 
   useEffect(() => {
