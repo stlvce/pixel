@@ -456,7 +456,8 @@ const App = () => {
         setTargetOffset(newOffset);
       }
     },
-    [selectedPixel, offset, scale, targetScale],
+    // TODO offset убрал
+    [selectedPixel, scale, targetScale],
   );
 
   useEffect(() => {
