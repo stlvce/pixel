@@ -1,4 +1,4 @@
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 
 import GoogleAuth from "@src/libs/google-auth";
 import { AuthContext } from "@src/store";
@@ -6,6 +6,7 @@ import RequestAPI from "@src/api";
 
 const AuthModal = () => {
   const { token, setToken, user, setUser } = useContext(AuthContext);
+  const [isLoading, setIsLoading] = useState(true);
 
   const openAuthModal = () => {
     const authModal = document.getElementById(
@@ -38,13 +39,16 @@ const AuthModal = () => {
     RequestAPI.getMe(token)
       .then((res) => {
         setUser(res);
+        setIsLoading(false);
       })
       .catch(handleLogout);
     // TODO только если expire token
   }, [token]);
 
   if (token) {
-    return (
+    return isLoading ? (
+      <div className="skeleton shrink-0 rounded-full w-12 h-12 fixed z-10 right-2 top-2" />
+    ) : (
       <div className="dropdown dropdown-end fixed z-10 right-2 top-2">
         <div className="avatar indicator">
           {user?.is_admin === 1 && (

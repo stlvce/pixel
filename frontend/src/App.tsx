@@ -51,6 +51,8 @@ const App = () => {
 
   const [color, setColor] = useState("#ff0000");
 
+  const [isBoardLoading, setIsBoardLoading] = useState(true);
+
   const clickThreshold = 5; // макс. расстояние (px), чтобы считалось кликом
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
 
@@ -371,6 +373,8 @@ const App = () => {
         ctx.fillStyle = pixel.color;
         ctx.fillRect(pixel.x, pixel.y, 1, 1);
       });
+
+      setIsBoardLoading(false);
     });
   }, []);
 
@@ -700,7 +704,12 @@ const App = () => {
   };
 
   return (
-    <div className="App">
+    <div>
+      {isBoardLoading && (
+        <div className="fixed top-0 left-0 right-0 bottom-0 bg-zinc-500/40 z-2 flex justify-center items-center">
+          <span className="loading loading-spinner text-primary" />
+        </div>
+      )}
       <AuthModal />
 
       <div
