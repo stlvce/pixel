@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { GoogleReCaptchaProvider } from "react-google-recaptcha-v3";
 
 import { AuthProvider } from "@src/store";
 import App from "./App.tsx";
@@ -10,7 +11,17 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ""}>
       <AuthProvider>
-        <App />
+        <GoogleReCaptchaProvider
+          reCaptchaKey={import.meta.env.VITE_RECAPTCHA_KEY}
+          container={{
+            parameters: {
+              badge: "inline",
+              theme: "dark",
+            },
+          }}
+        >
+          <App />
+        </GoogleReCaptchaProvider>
       </AuthProvider>
     </GoogleOAuthProvider>
   </StrictMode>,

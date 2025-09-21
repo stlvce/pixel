@@ -7,10 +7,16 @@ class UserRole(Enum):
     ADMIN = 1
 
 
+class UserStatus(Enum):
+    ACTIVE = "active"
+    BANNED = "banned"
+
+
 class UserOut(BaseModel):
     id: int
     email: str
     is_admin: int
+    status: str
 
 
 class PixelOut(BaseModel):

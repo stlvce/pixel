@@ -1,7 +1,6 @@
 import type { FC } from "react";
-import { useContext } from "react";
 
-import { AuthContext } from "@src/store";
+import Recaptcha from "@src/libs/recaptcha";
 
 type TPaintPopupProps = {
   color: string;
@@ -18,21 +17,7 @@ const PaintPopup: FC<TPaintPopupProps> = ({
   onCancel,
   cooldown,
 }) => {
-  const { token } = useContext(AuthContext);
-
   const handlePaint = () => {
-    if (!token) {
-      const authModal = document.getElementById(
-        "auth-modal",
-      ) as HTMLDialogElement;
-
-      if (authModal) {
-        authModal.showModal();
-      }
-
-      return;
-    }
-
     handlePlacePixel();
   };
 
@@ -56,13 +41,13 @@ const PaintPopup: FC<TPaintPopupProps> = ({
             Пиксель: {selectedPixel.x}, {selectedPixel.y}
           </p>
         </div>
-        <button
+        <Recaptcha
           className="btn btn-primary mt-3 w-full"
-          onClick={handlePaint}
+          onSuccess={handlePaint}
           disabled={cooldown > 0}
         >
           {cooldown > 0 ? `Подожди ${cooldown}с` : "Поставить"}
-        </button>
+        </Recaptcha>
       </div>
     </div>
   );

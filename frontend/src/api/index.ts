@@ -13,6 +13,7 @@ export type TUser = {
   id: number;
   is_admin: number;
   email: string;
+  status: "active" | "banned";
 };
 
 export default class RequestAPI {
@@ -65,5 +66,20 @@ export default class RequestAPI {
     }
 
     return response.json();
+  }
+
+  static async checkCaptcha(token: string, captcha: string) {
+    const res = fetch(
+      API_URL + "/auth/google/check" + `?code=${captcha}&token=${token}`,
+      {
+        method: "POST",
+      },
+    );
+
+    return res.then((res) => {
+      if (!res.ok) return Promise.reject(res);
+
+      return res.json();
+    });
   }
 }

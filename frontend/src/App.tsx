@@ -707,8 +707,13 @@ const App = () => {
   return (
     <div>
       {isBoardLoading && (
-        <div className="fixed top-0 left-0 right-0 bottom-0 bg-zinc-500/40 z-2 flex justify-center items-center">
+        <div className="fixed top-0 left-0 right-0 bottom-0 bg-zinc-500/40 z-3 flex justify-center items-center">
           <span className="loading loading-spinner text-primary" />
+        </div>
+      )}
+      {user && user.status === "banned" && (
+        <div className="fixed top-0 left-0 right-0 bottom-0 bg-zinc-500/40 z-2 flex justify-center items-center">
+          <span className="text-error font-bold text-4xl">Забанен</span>
         </div>
       )}
       <AuthModal />

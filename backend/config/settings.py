@@ -22,6 +22,7 @@ class GoogleSettings(Settings):
 
     CLIENT_ID: str
     JWT_SECRET: str
+    CAPTCHA_KEY: str
 
 
 class DatabaseSettings(Settings):

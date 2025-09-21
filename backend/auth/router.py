@@ -16,6 +16,10 @@ import httpx
 from config.database import get_db
 from config.settings import app_settings, google_settings
 from config.models import User
+from config.schemas import UserStatus
+
+from .security import get_current_user
+
 
 auth_router = APIRouter()
 
@@ -80,6 +84,7 @@ async def google_callback(
                     datetime.utcnow() + timedelta(days=app_settings.JWT_EXPIRE_DAYS)
                 ).timestamp()
             ),
+            "status": user.status.value,
         }
         my_token = jwt.encode(
             payload, app_settings.JWT_SECRET, algorithm=app_settings.JWT_ALG
@@ -90,3 +95,41 @@ async def google_callback(
         return RedirectResponse(redirect_url)
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid Google token")
+
+
+@auth_router.post("/google/check")
+async def google_recaptcha(
+    request: Request,
+    code: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if user.status == UserStatus.BANNED:
+        raise HTTPException(status_code=400, detail="User is banned")
+
+    data = {
+        "code": code,
+    }
+
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(
+            f"https://www.google.com/recaptcha/api/siteverify?secret={google_settings.CAPTCHA_KEY}&response={code}",
+            data=data,
+        )
+        token_json = token_resp.json()
+
+    is_success = token_json.get("success")
+    score = token_json.get("score")
+
+    if not is_success:
+        raise HTTPException(status_code=400, detail="Google reCAPTCHA failed")
+
+    if score is not None and score < 0.5:
+        user.status = UserStatus.BANNED
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+        raise HTTPException(
+            status_code=403, detail="User blocked due to low reCAPTCHA score"
+        )

@@ -17,7 +17,7 @@ from config.database import async_session, get_db
 from config.models import User, Pixel
 from board.ws_manager import ConnectionManager
 from auth.security import verify_jwt, get_current_user
-from config.schemas import UserRole, PixelOut, PixelsDeleteIn
+from config.schemas import UserRole, PixelOut, PixelsDeleteIn, UserStatus
 
 board_router = APIRouter()
 
@@ -56,6 +56,10 @@ async def websocket_endpoint(
             user_data = verify_jwt(token)
             user_id = user_data["sub"]
             is_authenticated = True
+            user_status = user_data["status"]
+
+            if user_status == UserStatus.BANNED.value:
+                raise HTTPException(status_code=403, detail="Banned user")
         except HTTPException:
             await websocket.close(code=1008)
             return
