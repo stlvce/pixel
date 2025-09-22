@@ -9,6 +9,7 @@ import { SideBar, AuthModal, PaintPopup } from "@src/components";
 import RequestAPI from "@src/api";
 import { BOARD_WIDTH, BOARD_HEIGHT, BG_WIDTH, BG_HEIGHT } from "@src/constants";
 import { AuthContext } from "@src/store";
+import { useTimer, useWebsocket } from "./hooks";
 
 const App = () => {
   const { user } = useContext(AuthContext);
@@ -16,8 +17,37 @@ const App = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const [ws, setWs] = useState<WebSocket | null>(null);
-  const [cooldown, setCooldown] = useState(0);
+  const ws = useWebsocket({
+    onInit: (initCooldown) => {
+      startTimer(initCooldown);
+
+      // белый фон
+      if (!canvasRef.current) return;
+
+      const ctx = canvasRef.current.getContext("2d");
+
+      if (!ctx) return;
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+    },
+    onDrawPixel: (...res) => {
+      drawPixel(...res);
+    },
+    onClear: (res) => {
+      res.forEach((pixel: { x: number; y: number }) => {
+        if (!canvasRef.current) return;
+
+        const ctx = canvasRef.current.getContext("2d");
+
+        if (!ctx) return;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(pixel.x, pixel.y, 1, 1);
+      });
+    },
+  });
+  const { cooldown, startTimer } = useTimer();
 
   const [scale, setScale] = useState(20);
   const [targetScale, setTargetScale] = useState(20);
@@ -69,17 +99,33 @@ const App = () => {
 
   // подтверждение постановки
   const handlePlacePixel = () => {
-    if (!selectedPixel || !ws) return;
-    if (cooldown > 0) {
-      alert(`Подожди ${cooldown} сек`);
-      return;
-    }
+    if (!selectedPixel || !ws || cooldown > 0) return;
 
-    const user = "test_user";
-
-    ws.send(JSON.stringify({ ...selectedPixel, color, user }));
-    setCooldown(60);
+    ws.send(JSON.stringify({ ...selectedPixel, color }));
+    startTimer();
     setSelectedPixel(null);
+  };
+
+  const handleDeletePixels = ({
+    start,
+    end,
+  }: {
+    start: { x: number; y: number };
+    end: { x: number; y: number };
+  }) => {
+    // Удаляем пиксели через API
+    const token = localStorage.getItem("jwt");
+
+    if (token) {
+      RequestAPI.deletePixels(token, {
+        start,
+        end,
+      }).then((res) => {
+        if (ws && res.length > 0) {
+          ws.send(JSON.stringify({ type: "clear", list: res }));
+        }
+      });
+    }
   };
 
   // зум относительно курсора
@@ -298,53 +344,6 @@ const App = () => {
     };
     animationRef.current = requestAnimationFrame(animateInertia);
   };
-
-  useEffect(() => {
-    const token = localStorage.getItem("jwt");
-    const socket = RequestAPI.openSocket(token);
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.type === "pixel") {
-        drawPixel(data.x, data.y, data.color);
-      } else if (data.type === "error") {
-        alert(data.error);
-      } else if (data.type === "init") {
-        setCooldown(data.coldown);
-      } else if (data.type === "clear") {
-        data.list.forEach((pixel: { x: number; y: number }) => {
-          if (!canvasRef.current) return;
-
-          const ctx = canvasRef.current.getContext("2d");
-
-          if (!ctx) return;
-
-          ctx.clearRect(pixel.x, pixel.y, 1, 1);
-        });
-      }
-    };
-    setWs(socket);
-
-    // белый фон
-    if (!canvasRef.current) return;
-
-    const ctx = canvasRef.current.getContext("2d");
-
-    if (!ctx) return;
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
-  }, []);
-
-  // кулдаун
-  useEffect(() => {
-    if (cooldown > 0) {
-      const timer = setInterval(() => {
-        setCooldown((c) => (c > 0 ? c - 1 : 0));
-      }, 1000);
-      return () => clearInterval(timer);
-    }
-  }, [cooldown]);
 
   // плавный зум
   useEffect(() => {
@@ -586,19 +585,7 @@ const App = () => {
       BOARD_HEIGHT - 1,
     );
 
-    // сообщение на сервер
-    const token = localStorage.getItem("jwt");
-
-    if (token) {
-      RequestAPI.deletePixels(token, {
-        start: { x: x1, y: y1 },
-        end: { x: x2, y: y2 },
-      }).then((res) => {
-        if (ws && res.length > 0) {
-          ws.send(JSON.stringify({ type: "clear", list: res }));
-        }
-      });
-    }
+    handleDeletePixels({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 } });
 
     setIsSelecting(false);
     setSelectionStart(null);
@@ -694,19 +681,7 @@ const App = () => {
       BOARD_HEIGHT - 1,
     );
 
-    // Удаляем пиксели через API
-    const token = localStorage.getItem("jwt");
-
-    if (token) {
-      RequestAPI.deletePixels(token, {
-        start: { x: x1, y: y1 },
-        end: { x: x2, y: y2 },
-      }).then((res) => {
-        if (ws && res.length > 0) {
-          ws.send(JSON.stringify({ type: "clear", list: res }));
-        }
-      });
-    }
+    handleDeletePixels({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 } });
 
     setIsSelecting(false);
     setSelectionStart(null);
