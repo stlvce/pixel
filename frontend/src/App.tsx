@@ -12,7 +12,7 @@ import {
   ControlButtons,
   Toolbar,
 } from "@src/components";
-import { Loader, PickColor } from "@src/UI";
+import { Loader } from "@src/UI";
 import RequestAPI from "@src/api";
 import { BOARD_WIDTH, BOARD_HEIGHT, BG_WIDTH, BG_HEIGHT } from "@src/constants";
 import { AuthContext } from "@src/store";
