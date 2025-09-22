@@ -95,8 +95,13 @@ async def websocket_endpoint(
     try:
         while True:
             data = await websocket.receive_json()
+
             # при записи пикселя — определяем идентификатор для кулдауна/логов
             actor = conn_key  # используем conn_key как идентификатор
+
+            if data.get("type") == "clear":
+                await manager.broadcast({"type": "clear", "list": data["list"]})
+                continue
 
             x, y, color = data["x"], data["y"], data["color"]
 

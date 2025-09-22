@@ -311,6 +311,16 @@ const App = () => {
         alert(data.error);
       } else if (data.type === "init") {
         setCooldown(data.coldown);
+      } else if (data.type === "clear") {
+        data.list.forEach((pixel: { x: number; y: number }) => {
+          if (!canvasRef.current) return;
+
+          const ctx = canvasRef.current.getContext("2d");
+
+          if (!ctx) return;
+
+          ctx.clearRect(pixel.x, pixel.y, 1, 1);
+        });
       }
     };
     setWs(socket);
@@ -584,10 +594,9 @@ const App = () => {
         start: { x: x1, y: y1 },
         end: { x: x2, y: y2 },
       }).then((res) => {
-        res.forEach((pixel) => {
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(pixel.x, pixel.y, 1, 1);
-        });
+        if (ws && res.length > 0) {
+          ws.send(JSON.stringify({ type: "clear", list: res }));
+        }
       });
     }
 
@@ -687,15 +696,15 @@ const App = () => {
 
     // Удаляем пиксели через API
     const token = localStorage.getItem("jwt");
+
     if (token) {
       RequestAPI.deletePixels(token, {
         start: { x: x1, y: y1 },
         end: { x: x2, y: y2 },
       }).then((res) => {
-        res.forEach((pixel: { x: number; y: number }) => {
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(pixel.x, pixel.y, 1, 1);
-        });
+        if (ws && res.length > 0) {
+          ws.send(JSON.stringify({ type: "clear", list: res }));
+        }
       });
     }
 
