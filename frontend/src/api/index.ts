@@ -1,4 +1,4 @@
-import { getAnonId } from "@src/utils/anon";
+import { getAnonId } from "@src/utils";
 
 const API_URL = import.meta.env.VITE_API_URL;
 

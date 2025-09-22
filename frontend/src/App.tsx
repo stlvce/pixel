@@ -9,7 +9,8 @@ import { SideBar, AuthModal, PaintPopup } from "@src/components";
 import RequestAPI from "@src/api";
 import { BOARD_WIDTH, BOARD_HEIGHT, BG_WIDTH, BG_HEIGHT } from "@src/constants";
 import { AuthContext } from "@src/store";
-import { useTimer, useWebsocket } from "./hooks";
+import { useTimer, useWebsocket } from "@src/hooks";
+import { zoomAtPoint, clamp } from "./utils";
 
 const App = () => {
   const { user } = useContext(AuthContext);
@@ -497,9 +498,6 @@ const App = () => {
   } | null>(null);
   const [isEdit, setIsEdit] = useState(true);
 
-  const clamp = (value: number, min: number, max: number) =>
-    Math.max(min, Math.min(max, value));
-
   // начало выделения
   const handleAdminMouseDown: MouseEventHandler<HTMLDivElement> = (e) => {
     if (user?.is_admin !== 1) return;
@@ -910,20 +908,5 @@ const App = () => {
     </div>
   );
 };
-
-function zoomAtPoint(
-  oldScale: number,
-  newScale: number,
-  pointX: number,
-  pointY: number,
-  offset: { x: number; y: number },
-) {
-  const scaleFactor = newScale / oldScale;
-
-  return {
-    x: pointX - (pointX - offset.x) * scaleFactor,
-    y: pointY - (pointY - offset.y) * scaleFactor,
-  };
-}
 
 export default App;
