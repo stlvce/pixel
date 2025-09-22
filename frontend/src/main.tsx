@@ -13,12 +13,7 @@ createRoot(document.getElementById("root")!).render(
       <AuthProvider>
         <GoogleReCaptchaProvider
           reCaptchaKey={import.meta.env.VITE_RECAPTCHA_KEY}
-          container={{
-            parameters: {
-              badge: "inline",
-              theme: "dark",
-            },
-          }}
+          language="ru"
         >
           <App />
         </GoogleReCaptchaProvider>

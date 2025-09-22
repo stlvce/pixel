@@ -46,3 +46,11 @@ input[type="color"]::-webkit-color-swatch {
   bottom: 5px;
   left: 5px;
 }
+
+.fab {
+  top: 1rem;
+  bottom: auto;
+  right: auto;
+  left: 1rem;
+  flex-direction: column;
+}
