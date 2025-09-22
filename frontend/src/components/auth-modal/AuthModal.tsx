@@ -49,7 +49,7 @@ const AuthModal = () => {
 
   if (token) {
     return isLoading ? (
-      <div className="skeleton shrink-0 rounded-full w-12 h-12 fixed z-10 right-2 top-2" />
+      <div className="skeleton shrink-0 rounded-full w-12 h-12 fixed z-2 right-2 top-2" />
     ) : (
       <div className="dropdown dropdown-end fixed z-10 right-2 top-2">
         <div className="avatar indicator">

@@ -12,6 +12,12 @@ class UserStatus(Enum):
     BANNED = "banned"
 
 
+class WSAction(Enum):
+    CLEAR = "clear"
+    PIXEL = "pixel"
+    ERROR = "error"
+
+
 class UserOut(BaseModel):
     id: int
     email: str

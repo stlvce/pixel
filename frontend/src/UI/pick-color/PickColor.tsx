@@ -1,10 +1,8 @@
-const SideBar = ({
-  color,
-  changeColor,
-}: {
-  color: string;
-  changeColor: (color: string) => void;
-}) => {
+import type { FC } from "react";
+
+import type { TPickColorProps } from "./PickColor.types";
+
+const PickColor: FC<TPickColorProps> = ({ color, changeColor }) => {
   return (
     <div className="bg-white flex align-center justify-center p-2 rounded-sm border border-gray-200 shadow-lg">
       <input
@@ -19,4 +17,4 @@ const SideBar = ({
   );
 };
 
-export default SideBar;
+export default PickColor;

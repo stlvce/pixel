@@ -17,14 +17,11 @@ from config.database import async_session, get_db
 from config.models import User, Pixel
 from board.ws_manager import ConnectionManager
 from auth.security import verify_jwt, get_current_user
-from config.schemas import UserRole, PixelOut, PixelsDeleteIn, UserStatus
+from config.schemas import UserRole, PixelOut, PixelsDeleteIn, UserStatus, WSAction
 
 board_router = APIRouter()
 
-# кулдаун для юзеров
-cooldowns = {}
-
-
+cooldowns = {}  # кулдаун для юзеров
 manager = ConnectionManager()
 
 
@@ -55,8 +52,8 @@ async def websocket_endpoint(
         try:
             user_data = verify_jwt(token)
             user_id = user_data["sub"]
-            is_authenticated = True
             user_status = user_data["status"]
+            is_authenticated = True
 
             if user_status == UserStatus.BANNED.value:
                 raise HTTPException(status_code=403, detail="Banned user")
@@ -67,21 +64,13 @@ async def websocket_endpoint(
         # если нет anon_id — сгенерируем (и клиенту его вернём)
         if not anon_id:
             anon_id = str(uuid.uuid4())
-            # мы не можем установить cookie здесь, но можем отправить клиенту сообщение с anon_id после accept
-        # anon_id используется как строковый идентификатор для анонимов
 
+    # Подключаем к сокету
     await websocket.accept()
-
-    # если мы сгенерировали anon_id server-side, сообщаем клиенту
-    if not token and not (
-        Query and anon_id
-    ):  # упрощённый пример; лучше всегда отправлять back the anon_id
-        await websocket.send_json({"type": "assign_anon", "anon_id": anon_id})
-
-    # регистрируем соединение в менеджере под ключом (auth user_id или "anon:"+anon_id)
     conn_key = f"user:{user_id}" if is_authenticated else f"anon:{anon_id}"
     await manager.connect(conn_key, websocket)
 
+    # Проверияем кулдаун
     last_time = cooldowns.get(conn_key, 0)
     now = time.time()
     if now - last_time < 60:
@@ -91,40 +80,39 @@ async def websocket_endpoint(
     else:
         await manager.send_to_user(conn_key, {"type": "init", "coldown": 0})
 
+    # Начинаем слушать события
     db: AsyncSession = async_session()
     try:
         while True:
             data = await websocket.receive_json()
 
-            # при записи пикселя — определяем идентификатор для кулдауна/логов
-            actor = conn_key  # используем conn_key как идентификатор
+            # при записи пикселя — определяем идентификатор для кулдауна/логов, используем conn_key как идентификатор
+            actor = conn_key
 
-            if data.get("type") == "clear":
-                await manager.broadcast({"type": "clear", "list": data["list"]})
+            if data.get("type") == WSAction.CLEAR.value:
+                await manager.broadcast(
+                    {"type": WSAction.CLEAR.value, "payload": data["list"]}
+                )
                 continue
 
             x, y, color = data["x"], data["y"], data["color"]
 
-            # кулдаун — теперь учитываем actor (anon or user)
+            # Проверияем кулдаун
             last_time = cooldowns.get(actor, 0)
             now = time.time()
             if now - last_time < 60:
                 await manager.send_to_user(
-                    conn_key, {"type": "error", "error": "Подожди"}
+                    conn_key,
+                    {"type": WSAction.ERROR.value, "payload": "Необходимо подождать"},
                 )
                 continue
 
             # если аноним — можно не сохранять user_id, либо сохранять anon_id в Pixel. Например:
             if is_authenticated and user_id:
                 pixel = Pixel(x=x, y=y, color=color, user_id=int(user_id))
-            else:
-                pixel = Pixel(
-                    x=x, y=y, color=color, anon_id=anon_id
-                )  # добавь поле anon_id в модели, если нужно
-            db.add(pixel)
-            await db.commit()
-
-            cooldowns[actor] = now
+                db.add(pixel)
+                await db.commit()
+                cooldowns[actor] = now
 
             await manager.broadcast(
                 {"type": "pixel", "x": x, "y": y, "color": color, "actor": conn_key}

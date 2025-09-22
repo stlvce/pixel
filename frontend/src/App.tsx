@@ -5,12 +5,19 @@ import type {
   TouchEventHandler,
 } from "react";
 
-import { SideBar, AuthModal, PaintPopup } from "@src/components";
+import {
+  AuthModal,
+  PaintPopup,
+  AdminMode,
+  ControlButtons,
+  Toolbar,
+} from "@src/components";
+import { Loader, PickColor } from "@src/UI";
 import RequestAPI from "@src/api";
 import { BOARD_WIDTH, BOARD_HEIGHT, BG_WIDTH, BG_HEIGHT } from "@src/constants";
 import { AuthContext } from "@src/store";
 import { useTimer, useWebsocket } from "@src/hooks";
-import { zoomAtPoint, clamp } from "./utils";
+import { zoomAtPoint, clamp } from "@src/utils";
 
 const App = () => {
   const { user } = useContext(AuthContext);
@@ -46,6 +53,14 @@ const App = () => {
         ctx.fillStyle = "#ffffff";
         ctx.fillRect(pixel.x, pixel.y, 1, 1);
       });
+    },
+    fillBg: () => {
+      // белый фон
+      // if (!canvasRef.current) return;
+      // const ctx = canvasRef.current.getContext("2d");
+      // if (!ctx) return;
+      // ctx.fillStyle = "#ffffff";
+      // ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
     },
   });
   const { cooldown, startTimer } = useTimer();
@@ -688,16 +703,37 @@ const App = () => {
 
   return (
     <div>
-      {isBoardLoading && (
-        <div className="fixed top-0 left-0 right-0 bottom-0 bg-zinc-500/40 z-3 flex justify-center items-center">
-          <span className="loading loading-spinner text-primary" />
-        </div>
-      )}
+      {isBoardLoading && <Loader />}
+
+      {/* Плажка режима модерации */}
+      {user?.is_admin === 1 && <AdminMode isEdit={isEdit} />}
+
+      {/* Сообщение о бане */}
       {user && user.status === "banned" && (
-        <div className="fixed top-0 left-0 right-0 bottom-0 bg-zinc-500/40 z-2 flex justify-center items-center">
+        <div className="fixed top-0 left-0 right-0 bottom-0 bg-zinc-500/40 z-3 flex justify-center items-center">
           <span className="text-error font-bold text-4xl">Забанен</span>
         </div>
       )}
+
+      {/* Тулбар */}
+      <Toolbar
+        isAdmin={user?.is_admin === 1}
+        color={color}
+        changeColor={(newColor) => setColor(newColor)}
+        selectEditMode={() => {
+          setIsEdit(true);
+        }}
+        selectRemoveMode={() => {
+          if (isEdit) {
+            setSelectedPixel(null);
+            setHoverPixel(null);
+          }
+
+          setIsEdit(false);
+        }}
+      />
+
+      {/* Модальное окно авторизации */}
       <AuthModal />
 
       <div
@@ -725,6 +761,7 @@ const App = () => {
           }}
           ref={canvasRef}
         />
+
         {/* Подсветка наведения */}
         {hoverPixel && !dragging && (
           <div
@@ -740,6 +777,7 @@ const App = () => {
             }}
           />
         )}
+
         {/* Подсветка выбранного пикселя */}
         {selectedPixel && (
           <div
@@ -755,60 +793,34 @@ const App = () => {
             }}
           />
         )}
-      </div>
 
-      {isSelecting && selectionStart && selectionEnd && (
-        <div
-          style={{
-            position: "absolute",
-            left: offset.x + Math.min(selectionStart.x, selectionEnd.x) * scale,
-            top: offset.y + Math.min(selectionStart.y, selectionEnd.y) * scale,
-            width: (Math.abs(selectionEnd.x - selectionStart.x) + 1) * scale,
-            height: (Math.abs(selectionEnd.y - selectionStart.y) + 1) * scale,
-            border: "2px dashed red",
-            backgroundColor: "rgba(255,0,0,0.2)",
-            pointerEvents: "none",
-          }}
-        />
-      )}
+        {isSelecting && selectionStart && selectionEnd && (
+          <div
+            style={{
+              position: "absolute",
+              left:
+                offset.x + Math.min(selectionStart.x, selectionEnd.x) * scale,
+              top:
+                offset.y + Math.min(selectionStart.y, selectionEnd.y) * scale,
+              width: (Math.abs(selectionEnd.x - selectionStart.x) + 1) * scale,
+              height: (Math.abs(selectionEnd.y - selectionStart.y) + 1) * scale,
+              border: "2px dashed red",
+              backgroundColor: "rgba(255,0,0,0.2)",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+      </div>
 
       {/* Кнопки управления */}
-      <div className="absolute left-5 bottom-5 flex flex-col gap-2 select-none hidden md:flex">
-        <div className="flex justify-center gap-5">
-          <div className="relative">
-            <button
-              className="btn w-10"
-              onClick={() => handleControl("zoomIn")}
-            >
-              +
-            </button>
-            <kbd className="kbd kbd-xs absolute -top-1 -right-1">Q</kbd>
-          </div>
-          <button className="btn w-10" onClick={() => handleControl("up")}>
-            ▲
-          </button>
-          <div className="relative">
-            <button
-              className="btn w-10"
-              onClick={() => handleControl("zoomOut")}
-            >
-              -
-            </button>
-            <kbd className="kbd kbd-xs absolute -top-1 -right-1">W</kbd>
-          </div>
-        </div>
-        <div className="flex justify-center gap-5">
-          <button className="btn w-10" onClick={() => handleControl("left")}>
-            ◀︎
-          </button>
-          <button className="btn w-10" onClick={() => handleControl("down")}>
-            ▼
-          </button>
-          <button className="btn w-10" onClick={() => handleControl("right")}>
-            ▶︎
-          </button>
-        </div>
-      </div>
+      <ControlButtons
+        onZoomIn={() => handleControl("zoomIn")}
+        onZoomOut={() => handleControl("zoomOut")}
+        onUp={() => handleControl("up")}
+        onDown={() => handleControl("down")}
+        onLeft={() => handleControl("left")}
+        onRight={() => handleControl("right")}
+      />
 
       {/* Подтверждение поставки пикселя */}
       <PaintPopup
@@ -818,93 +830,6 @@ const App = () => {
         cooldown={cooldown}
         onCancel={() => setSelectedPixel(null)}
       />
-
-      {/* Тулбар */}
-      <div className="fab">
-        <div tabIndex={0} role="button" className="btn btn-lg btn-circle">
-          <svg
-            className="size-6"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth="1.5"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
-            />
-          </svg>
-        </div>
-
-        {/* Выбор цвета */}
-        <button className="btn btn-lg btn-circle overflow-hidden">
-          <SideBar
-            color={color}
-            changeColor={(newColor) => setColor(newColor)}
-          />
-        </button>
-        {user?.is_admin === 1 && (
-          <>
-            {/* Редактирование */}
-            <button
-              className="btn btn-lg btn-circle"
-              onClick={() => {
-                setIsEdit(true);
-              }}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="size-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125"
-                />
-              </svg>
-            </button>
-
-            {/* Удаление */}
-            <button
-              className="btn btn-lg btn-circle"
-              onClick={() => {
-                if (isEdit) {
-                  setSelectedPixel(null);
-                  setHoverPixel(null);
-                }
-
-                setIsEdit(false);
-              }}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.5}
-                stroke="currentColor"
-                className="size-6"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0"
-                />
-              </svg>
-            </button>
-          </>
-        )}
-      </div>
-      {user?.is_admin === 1 && (
-        <div className="fixed top-2 left-1/2 -translate-x-1/2 bg-white px-5 py-2 rounded-lg shadow-xl/10 border-1 border-gray-200 z-10">
-          Режим: {isEdit ? "редактирования" : "модерация"}
-        </div>
-      )}
     </div>
   );
 };

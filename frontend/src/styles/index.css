@@ -53,4 +53,5 @@ input[type="color"]::-webkit-color-swatch {
   right: auto;
   left: 1rem;
   flex-direction: column;
+  z-index: 2;
 }
