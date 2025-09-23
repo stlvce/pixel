@@ -28,16 +28,6 @@ const App = () => {
   const ws = useWebsocket({
     onInit: (initCooldown) => {
       startTimer(initCooldown);
-
-      // белый фон
-      if (!canvasRef.current) return;
-
-      const ctx = canvasRef.current.getContext("2d");
-
-      if (!ctx) return;
-
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
     },
     onDrawPixel: (...res) => {
       drawPixel(...res);
@@ -56,11 +46,11 @@ const App = () => {
     },
     fillBg: () => {
       // белый фон
-      // if (!canvasRef.current) return;
-      // const ctx = canvasRef.current.getContext("2d");
-      // if (!ctx) return;
-      // ctx.fillStyle = "#ffffff";
-      // ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+      if (!canvasRef.current) return;
+      const ctx = canvasRef.current.getContext("2d");
+      if (!ctx) return;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
     },
   });
   const { cooldown, startTimer } = useTimer();

@@ -25,6 +25,9 @@ cooldowns = {}  # кулдаун для юзеров
 manager = ConnectionManager()
 
 
+COOLDOWN = 30
+
+
 @board_router.get("", response_model=list[PixelOut])
 async def get_board(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Pixel, User).join(User, Pixel.user_id == User.id))
@@ -73,9 +76,9 @@ async def websocket_endpoint(
     # Проверияем кулдаун
     last_time = cooldowns.get(conn_key, 0)
     now = time.time()
-    if now - last_time < 60:
+    if now - last_time < COOLDOWN:
         await manager.send_to_user(
-            conn_key, {"type": "init", "coldown": 60 - round(now - last_time)}
+            conn_key, {"type": "init", "coldown": COOLDOWN - round(now - last_time)}
         )
     else:
         await manager.send_to_user(conn_key, {"type": "init", "coldown": 0})
@@ -100,7 +103,7 @@ async def websocket_endpoint(
             # Проверияем кулдаун
             last_time = cooldowns.get(actor, 0)
             now = time.time()
-            if now - last_time < 60:
+            if now - last_time < COOLDOWN:
                 await manager.send_to_user(
                     conn_key,
                     {"type": WSAction.ERROR.value, "payload": "Необходимо подождать"},

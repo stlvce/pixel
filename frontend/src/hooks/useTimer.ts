@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 
+import { COOLDOWN } from "@src/constants";
+
 export const useTimer = () => {
   const [cooldown, setCooldown] = useState(0);
 
@@ -14,7 +16,7 @@ export const useTimer = () => {
 
   return {
     cooldown,
-    startTimer: (newCooldown = 60) => {
+    startTimer: (newCooldown = COOLDOWN) => {
       setCooldown(newCooldown);
     },
   };

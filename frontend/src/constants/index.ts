@@ -4,4 +4,5 @@ export {
   BG_WIDTH,
   BG_HEIGHT,
   CLICK_THRESHOLD,
+  COOLDOWN,
 } from "./board";
