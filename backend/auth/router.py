@@ -38,7 +38,7 @@ async def create_session():
         "session_id",
         session_id,
         httponly=True,
-        secure=True,
+        # secure=True,
         samesite="lax",
         max_age=60 * 60 * 24 * 365,
     )
@@ -46,7 +46,7 @@ async def create_session():
         "session_sig",
         sig,
         httponly=True,
-        secure=True,
+        # secure=True,
         samesite="lax",
         max_age=60 * 60 * 24 * 365,
     )
