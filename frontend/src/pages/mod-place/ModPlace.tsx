@@ -29,6 +29,19 @@ const ModPlace = () => {
   const ws = useWebsocket({
     onInit: (initCooldown) => {
       startTimer(initCooldown);
+      const img = new Image();
+      img.src = "/bg.png"; // путь к картинке
+      img.onload = () => {
+        if (!canvasRef.current) return;
+        const ctx = canvasRef.current.getContext("2d");
+        if (!ctx) return;
+
+        // рисуем картинку по центру
+        const x = (BOARD_WIDTH - BG_WIDTH) / 2;
+        const y = (BOARD_HEIGHT - BG_HEIGHT) / 2;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, x, y, BG_WIDTH, BG_HEIGHT);
+      };
     },
     onDrawPixel: (...res) => {
       drawPixel(...res);
@@ -392,22 +405,6 @@ const ModPlace = () => {
 
       setIsBoardLoading(false);
     });
-  }, []);
-
-  useEffect(() => {
-    const img = new Image();
-    img.src = "/bg.png"; // путь к картинке
-    img.onload = () => {
-      if (!canvasRef.current) return;
-      const ctx = canvasRef.current.getContext("2d");
-      if (!ctx) return;
-
-      // рисуем картинку по центру
-      const x = (BOARD_WIDTH - BG_WIDTH) / 2;
-      const y = (BOARD_HEIGHT - BG_HEIGHT) / 2;
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, x, y, BG_WIDTH, BG_HEIGHT);
-    };
   }, []);
 
   const handleControl = useCallback(
