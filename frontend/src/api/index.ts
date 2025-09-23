@@ -1,5 +1,3 @@
-import { getAnonId } from "@src/utils";
-
 const API_URL = import.meta.env.VITE_API_URL;
 
 type TPixel = { x: number; y: number; color: string; user: string };
@@ -11,7 +9,7 @@ type DeletePixelsIn = {
 
 export type TUser = {
   id: number;
-  is_admin: number;
+  role: number;
   email: string;
   status: "active" | "banned";
 };
@@ -21,16 +19,24 @@ export default class RequestAPI {
     return fetch(API_URL + "/board").then((res) => res.json());
   }
 
-  static openSocket(token: string | null) {
-    const anonId = getAnonId();
+  static async createSession() {
+    return fetch(API_URL + "/auth/session", {
+      method: "POST",
+      credentials: "include",
+    });
+  }
 
-    const params = new URLSearchParams();
-    if (token) params.set("token", token);
-    else params.set("anon_id", anonId);
+  static async checkSession(): Promise<boolean> {
+    const res = await fetch(API_URL + "/auth/session", {
+      credentials: "include",
+    });
+    const data = await res.json();
 
-    return new WebSocket(
-      import.meta.env.VITE_API_URL_WS + "/board/ws?" + params.toString(),
-    );
+    return data.exists;
+  }
+
+  static openSocket() {
+    return new WebSocket(import.meta.env.VITE_API_URL_WS + "/board/ws");
   }
 
   static async getMe(token: string): Promise<TUser> {

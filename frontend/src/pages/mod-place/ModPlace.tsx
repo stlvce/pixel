@@ -506,7 +506,7 @@ const ModPlace = () => {
 
   // начало выделения
   const handleAdminMouseDown: MouseEventHandler<HTMLDivElement> = (e) => {
-    if (user?.is_admin !== 1) return;
+    if (user?.role !== 1) return;
     if (!containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
@@ -520,7 +520,7 @@ const ModPlace = () => {
 
   // тянем прямоугольник
   const handleAdminMouseMove: MouseEventHandler<HTMLDivElement> = (e) => {
-    if (user?.is_admin !== 1 || !isSelecting || !selectionStart) return;
+    if (user?.role !== 1 || !isSelecting || !selectionStart) return;
     if (!containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
@@ -555,7 +555,7 @@ const ModPlace = () => {
   // отпускаем — очищаем
   const handleAdminMouseUp: MouseEventHandler<HTMLDivElement> = () => {
     if (
-      user?.is_admin !== 1 ||
+      user?.role !== 1 ||
       !isSelecting ||
       !selectionStart ||
       !selectionEnd ||
@@ -597,7 +597,7 @@ const ModPlace = () => {
   };
 
   const handleAdminTouchStart: TouchEventHandler<HTMLDivElement> = (e) => {
-    if (user?.is_admin !== 1 || e.touches.length !== 1) return;
+    if (user?.role !== 1 || e.touches.length !== 1) return;
     if (!containerRef.current) return;
 
     const touch = e.touches[0];
@@ -612,7 +612,7 @@ const ModPlace = () => {
 
   const handleAdminTouchMove: TouchEventHandler<HTMLDivElement> = (e) => {
     if (
-      user?.is_admin !== 1 ||
+      user?.role !== 1 ||
       !isSelecting ||
       !selectionStart ||
       e.touches.length !== 1
@@ -651,12 +651,7 @@ const ModPlace = () => {
   };
 
   const handleAdminTouchEnd: TouchEventHandler<HTMLDivElement> = () => {
-    if (
-      user?.is_admin !== 1 ||
-      !isSelecting ||
-      !selectionStart ||
-      !selectionEnd
-    ) {
+    if (user?.role !== 1 || !isSelecting || !selectionStart || !selectionEnd) {
       setIsSelecting(false);
       return;
     }
@@ -696,15 +691,14 @@ const ModPlace = () => {
     <div>
       {isBoardLoading && <Loader />}
 
-      {/* Плажка режима модерации */}
-      {user?.is_admin === 1 && <AdminMode isEdit={isEdit} />}
-
-      {/* Сообщение о бане */}
+      {/* Если нет прав модерации */}
+      {user && user.role !== 1 && <FullscreenMsg text="Доступ запрещен" />}
+      {/* Если забанен */}
       {user && user.status === "banned" && <FullscreenMsg text="Забанен" />}
 
       {/* Тулбар */}
       <Toolbar
-        isAdmin={user?.is_admin === 1}
+        isAdmin={user?.role === 1}
         color={color}
         changeColor={(newColor) => setColor(newColor)}
         selectEditMode={() => {
@@ -719,6 +713,9 @@ const ModPlace = () => {
           setIsEdit(false);
         }}
       />
+
+      {/* Плажка режима модерации */}
+      <AdminMode isEdit={isEdit} />
 
       {/* Модальное окно авторизации */}
       <AuthModal />

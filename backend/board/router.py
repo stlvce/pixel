@@ -2,7 +2,6 @@ from fastapi import (
     APIRouter,
     WebSocket,
     WebSocketDisconnect,
-    Query,
     HTTPException,
     Depends,
 )
@@ -10,7 +9,6 @@ import time
 from sqlalchemy import delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-import uuid
 from typing import Union
 
 from config.database import async_session, get_db
@@ -30,23 +28,30 @@ COOLDOWN = 30
 
 @board_router.get("", response_model=list[PixelOut])
 async def get_board(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Pixel, User).join(User, Pixel.user_id == User.id))
-    pixels = result.all()
+    result = await db.execute(select(Pixel))
+    pixels = result.scalars().all()
+
     return [
         {
-            "id": p.Pixel.id,
-            "x": p.Pixel.x,
-            "y": p.Pixel.y,
-            "color": p.Pixel.color,
+            "id": p.id,
+            "x": p.x,
+            "y": p.y,
+            "color": p.color,
         }
         for p in pixels
     ]
 
 
 @board_router.websocket("/ws")
-async def websocket_endpoint(
-    websocket: WebSocket, token: str = Query(None), anon_id: str = Query(None)
-):
+async def websocket_endpoint(websocket: WebSocket):
+    session_id = websocket.cookies.get("session_id")
+
+    if not session_id:
+        await websocket.close(code=1008)
+        return
+
+    token = websocket.cookies.get("token")
+
     # если есть токен — верифицируем
     user_id: Union[str, None] = None
     is_authenticated = False
@@ -60,28 +65,24 @@ async def websocket_endpoint(
 
             if user_status == UserStatus.BANNED.value:
                 raise HTTPException(status_code=403, detail="Banned user")
+
         except HTTPException:
             await websocket.close(code=1008)
             return
-    else:
-        # если нет anon_id — сгенерируем (и клиенту его вернём)
-        if not anon_id:
-            anon_id = str(uuid.uuid4())
 
     # Подключаем к сокету
     await websocket.accept()
-    conn_key = f"user:{user_id}" if is_authenticated else f"anon:{anon_id}"
-    await manager.connect(conn_key, websocket)
+    await manager.connect(session_id, websocket)
 
     # Проверияем кулдаун
-    last_time = cooldowns.get(conn_key, 0)
+    last_time = cooldowns.get(session_id, 0)
     now = time.time()
     if now - last_time < COOLDOWN:
         await manager.send_to_user(
-            conn_key, {"type": "init", "coldown": COOLDOWN - round(now - last_time)}
+            session_id, {"type": "init", "coldown": COOLDOWN - round(now - last_time)}
         )
     else:
-        await manager.send_to_user(conn_key, {"type": "init", "coldown": 0})
+        await manager.send_to_user(session_id, {"type": "init", "coldown": 0})
 
     # Начинаем слушать события
     db: AsyncSession = async_session()
@@ -90,7 +91,7 @@ async def websocket_endpoint(
             data = await websocket.receive_json()
 
             # при записи пикселя — определяем идентификатор для кулдауна/логов, используем conn_key как идентификатор
-            actor = conn_key
+            actor = session_id
 
             if data.get("type") == WSAction.CLEAR.value:
                 await manager.broadcast(
@@ -105,23 +106,20 @@ async def websocket_endpoint(
             now = time.time()
             if now - last_time < COOLDOWN:
                 await manager.send_to_user(
-                    conn_key,
+                    session_id,
                     {"type": WSAction.ERROR.value, "payload": "Необходимо подождать"},
                 )
                 continue
 
-            # если аноним — можно не сохранять user_id, либо сохранять anon_id в Pixel. Например:
-            if is_authenticated and user_id:
-                pixel = Pixel(x=x, y=y, color=color, user_id=int(user_id))
-                db.add(pixel)
-                await db.commit()
-                cooldowns[actor] = now
+            pixel = Pixel(x=x, y=y, color=color, session_id=session_id)
+            db.add(pixel)
+            await db.commit()
+            cooldowns[actor] = now
 
-            await manager.broadcast(
-                {"type": "pixel", "x": x, "y": y, "color": color, "actor": conn_key}
-            )
+            await manager.broadcast({"type": "pixel", "x": x, "y": y, "color": color})
+
     except WebSocketDisconnect:
-        manager.disconnect(conn_key, websocket)
+        manager.disconnect(session_id, websocket)
 
 
 @board_router.delete("/delete_pixels")
@@ -131,7 +129,7 @@ async def delete_pixels(
     db: AsyncSession = Depends(get_db),
 ):
     # Проверяем права
-    if user.is_admin != UserRole.ADMIN.value:
+    if user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Not enough rights")
 
     # Проверяем наличие start и end

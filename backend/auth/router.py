@@ -4,7 +4,7 @@ from fastapi import (
     Depends,
     Request,
 )
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from jose import jwt
@@ -12,16 +12,61 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from datetime import datetime, timedelta
 import httpx
+import hmac
+import hashlib
+import uuid
 
 from config.database import get_db
 from config.settings import app_settings, google_settings
 from config.models import User
 from config.schemas import UserStatus
 
-from .security import get_current_user
+from .security import get_current_user, verify_session
 
 
 auth_router = APIRouter()
+
+
+@auth_router.post("/session")
+async def create_session():
+    session_id = str(uuid.uuid4())
+    sig = hmac.new(
+        app_settings.JWT_SECRET.encode(), session_id.encode(), hashlib.sha256
+    ).hexdigest()
+    response = JSONResponse({"ok": True})
+    response.set_cookie(
+        "session_id",
+        session_id,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 365,
+    )
+    response.set_cookie(
+        "session_sig",
+        sig,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 365,
+    )
+
+    return response
+
+
+@auth_router.get("/session")
+async def check_session(request: Request):
+    # Берём cookie
+    session_id = request.cookies.get("session_id")
+    session_sig = request.cookies.get("session_sig")
+
+    if not session_id or not session_sig:
+        return JSONResponse({"exists": False})
+
+    if not verify_session(session_id, session_sig):
+        return JSONResponse({"exists": False})
+
+    return JSONResponse({"exists": True})
 
 
 @auth_router.get("/google/login")
@@ -91,7 +136,7 @@ async def google_callback(
         )
 
         # Редирект на фронт с токеном
-        redirect_url = f"{app_settings.URL}?token={my_token}"
+        redirect_url = f"{app_settings.URL}/mod?token={my_token}"
         return RedirectResponse(redirect_url)
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid Google token")

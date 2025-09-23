@@ -2,10 +2,19 @@ from fastapi import HTTPException, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from jose import jwt, JWTError, ExpiredSignatureError
+import hmac
+import hashlib
 
 from config.settings import app_settings
 from config.database import get_db
 from config.models import User
+
+
+def verify_session(session_id: str, session_sig: str) -> bool:
+    expected_sig = hmac.new(
+        app_settings.JWT_SECRET.encode(), session_id.encode(), hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(expected_sig, session_sig)
 
 
 def verify_jwt(token: str):

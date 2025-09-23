@@ -24,18 +24,6 @@ const Recaptcha: FC<TRecaptchaProps> = ({
   const handleClick = async () => {
     if (user?.status === "banned") return;
 
-    if (!token) {
-      const authModal = document.getElementById(
-        "auth-modal",
-      ) as HTMLDialogElement;
-
-      if (authModal) {
-        authModal.showModal();
-      }
-
-      return;
-    }
-
     if (!executeRecaptcha) {
       console.log("Execute recaptcha not yet available");
       return;
@@ -47,9 +35,7 @@ const Recaptcha: FC<TRecaptchaProps> = ({
       setIsLoading(true);
 
       RequestAPI.checkCaptcha(token, captcha)
-        .then(() => {
-          onSuccess();
-        })
+        .then(() => {})
         .catch((err) => {
           console.log(err);
         })
@@ -57,6 +43,8 @@ const Recaptcha: FC<TRecaptchaProps> = ({
           setIsLoading(false);
         });
     }
+
+    onSuccess();
   };
 
   return (

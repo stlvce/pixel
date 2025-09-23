@@ -18,22 +18,25 @@ export const useWebsocket = ({
   const [ws, setWs] = useState<WebSocket | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem("jwt");
-    const socket = RequestAPI.openSocket(token);
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
+    RequestAPI.checkSession().then((res) => {
+      if (!res) RequestAPI.createSession();
 
-      if (data.type === "pixel") {
-        onDrawPixel(data.x, data.y, data.color);
-      } else if (data.type === "init") {
-        onInit(data.coldown);
-      } else if (data.type === "clear") {
-        onClear(data.payload);
-      }
-    };
-    setWs(socket);
+      const socket = RequestAPI.openSocket();
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
 
-    fillBg();
+        if (data.type === "pixel") {
+          onDrawPixel(data.x, data.y, data.color);
+        } else if (data.type === "init") {
+          onInit(data.coldown);
+        } else if (data.type === "clear") {
+          onClear(data.payload);
+        }
+      };
+      setWs(socket);
+
+      fillBg();
+    });
   }, []);
 
   return ws;

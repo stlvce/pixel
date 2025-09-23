@@ -34,7 +34,10 @@ const AuthModal = () => {
   }, []);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      openAuthModal();
+      return;
+    }
 
     RequestAPI.getMe(token)
       .then((res) => {
@@ -53,7 +56,7 @@ const AuthModal = () => {
     ) : (
       <div className="dropdown dropdown-end fixed z-10 right-2 top-2">
         <div className="avatar indicator">
-          {user?.is_admin === 1 && (
+          {user?.role === 1 && (
             <span className="indicator-item indicator-bottom indicator-start stroke-primary bg-white rounded-full p-0.5">
               <svg
                 className="size-5"
@@ -114,28 +117,14 @@ const AuthModal = () => {
   }
 
   return (
-    <>
-      <button className="btn fixed z-10 right-2 top-2" onClick={openAuthModal}>
-        Войти
-      </button>
-      <dialog id="auth-modal" className="modal">
-        <div className="modal-box">
-          <form method="dialog">
-            <button className="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">
-              ✕
-            </button>
-          </form>
-          <h3 className="font-bold text-lg">Вход</h3>
-          <div className="pt-5">
-            <GoogleAuth onSuccess={setToken} />
-          </div>
+    <dialog id="auth-modal" className="modal">
+      <div className="modal-box">
+        <h3 className="font-bold text-lg">Вход</h3>
+        <div className="pt-5">
+          <GoogleAuth onSuccess={setToken} />
         </div>
-
-        <form method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
-    </>
+      </div>
+    </dialog>
   );
 };
 

@@ -21,7 +21,7 @@ class WSAction(Enum):
 class UserOut(BaseModel):
     id: int
     email: str
-    is_admin: int
+    role: UserRole
     status: str
 
 
