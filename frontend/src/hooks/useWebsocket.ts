@@ -3,23 +3,27 @@ import { useState, useEffect } from "react";
 import RequestAPI from "@src/api";
 
 type TUseWebsocketProps = {
-  onDrawPixel: (x: number, y: number, color: string) => void;
   onInit: (initCooldown: number) => void;
+  onDrawPixel: (x: number, y: number, color: string) => void;
   onClear: (pixels: { x: number; y: number }[]) => void;
   fillBg: () => void;
 };
 
 export const useWebsocket = ({
-  onDrawPixel,
   onInit,
+  onDrawPixel,
   onClear,
   fillBg,
 }: TUseWebsocketProps) => {
   const [ws, setWs] = useState<WebSocket | null>(null);
 
   useEffect(() => {
-    RequestAPI.checkSession().then((res) => {
-      if (!res) RequestAPI.createSession();
+    const connectWS = async () => {
+      const res = await RequestAPI.checkSession();
+
+      if (!res) {
+        await RequestAPI.createSession();
+      }
 
       const socket = RequestAPI.openSocket();
       socket.onmessage = (event) => {
@@ -36,7 +40,9 @@ export const useWebsocket = ({
       setWs(socket);
 
       fillBg();
-    });
+    };
+
+    connectWS();
   }, []);
 
   return ws;
