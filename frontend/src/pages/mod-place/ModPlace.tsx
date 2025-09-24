@@ -26,22 +26,39 @@ const ModPlace = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  const [isBoardLoading, setIsBoardLoading] = useState(true);
+
   const ws = useWebsocket({
     onInit: (initCooldown) => {
       startTimer(initCooldown);
-      const img = new Image();
-      img.src = "/bg.png"; // путь к картинке
-      img.onload = () => {
+      RequestAPI.getBoard().then((data) => {
         if (!canvasRef.current) return;
+
         const ctx = canvasRef.current.getContext("2d");
+
         if (!ctx) return;
 
-        // рисуем картинку по центру
-        const x = (BOARD_WIDTH - BG_WIDTH) / 2;
-        const y = (BOARD_HEIGHT - BG_HEIGHT) / 2;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, x, y, BG_WIDTH, BG_HEIGHT);
-      };
+        const img = new Image();
+        img.src = "/bg.png"; // путь к картинке
+        img.onload = () => {
+          // Белый фон
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+
+          // Рисуем картинку по центру
+          const x = (BOARD_WIDTH - BG_WIDTH) / 2;
+          const y = (BOARD_HEIGHT - BG_HEIGHT) / 2;
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(img, x, y, BG_WIDTH, BG_HEIGHT);
+
+          data.forEach((pixel) => {
+            ctx.fillStyle = pixel.color;
+            ctx.fillRect(pixel.x, pixel.y, 1, 1);
+          });
+
+          setIsBoardLoading(false);
+        };
+      });
     },
     onDrawPixel: (...res) => {
       drawPixel(...res);
@@ -60,11 +77,11 @@ const ModPlace = () => {
     },
     fillBg: () => {
       // белый фон
-      if (!canvasRef.current) return;
-      const ctx = canvasRef.current.getContext("2d");
-      if (!ctx) return;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
+      // if (!canvasRef.current) return;
+      // const ctx = canvasRef.current.getContext("2d");
+      // if (!ctx) return;
+      // ctx.fillStyle = "#ffffff";
+      // ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
     },
   });
   const { cooldown, startTimer } = useTimer();
@@ -100,8 +117,6 @@ const ModPlace = () => {
   const animationRef = useRef<number | null>(null);
 
   const [color, setColor] = useState("#ff0000");
-
-  const [isBoardLoading, setIsBoardLoading] = useState(true);
 
   const clickThreshold = 5; // макс. расстояние (px), чтобы считалось кликом
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
@@ -388,24 +403,6 @@ const ModPlace = () => {
     animate();
     return () => cancelAnimationFrame(animation);
   }, [targetScale, targetOffset]);
-
-  useEffect(() => {
-    RequestAPI.getBoard().then((data) => {
-      if (!canvasRef.current) return;
-
-      const ctx = canvasRef.current.getContext("2d");
-      // ctx.clearRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
-
-      if (!ctx) return;
-
-      data.forEach((pixel) => {
-        ctx.fillStyle = pixel.color;
-        ctx.fillRect(pixel.x, pixel.y, 1, 1);
-      });
-
-      setIsBoardLoading(false);
-    });
-  }, []);
 
   const handleControl = useCallback(
     (action: "up" | "down" | "left" | "right" | "zoomIn" | "zoomOut") => {
