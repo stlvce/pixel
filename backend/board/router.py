@@ -85,7 +85,6 @@ async def websocket_endpoint(websocket: WebSocket):
         await manager.send_to_user(session_id, {"type": "init", "coldown": 0})
 
     # Начинаем слушать события
-    db: AsyncSession = async_session()
     try:
         while True:
             data = await websocket.receive_json()
@@ -111,9 +110,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
                 continue
 
-            pixel = Pixel(x=x, y=y, color=color, session_id=session_id)
-            db.add(pixel)
-            await db.commit()
+            async with async_session() as db:
+                pixel = Pixel(x=x, y=y, color=color, session_id=session_id)
+                db.add(pixel)
+                await db.commit()
+
             cooldowns[actor] = now
 
             await manager.broadcast({"type": "pixel", "x": x, "y": y, "color": color})
