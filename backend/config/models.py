@@ -1,6 +1,6 @@
 from datetime import datetime
-from sqlalchemy import String, DateTime, ForeignKey, Enum
-from sqlalchemy.orm import relationship, Mapped, mapped_column
+from sqlalchemy import String, DateTime, Enum
+from sqlalchemy.orm import Mapped, mapped_column
 
 from config.database import Base
 from config.schemas import UserRole, UserStatus

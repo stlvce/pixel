@@ -38,6 +38,6 @@ class DatabaseSettings(Settings):
         return f"postgresql+asyncpg://{self.USER}:{self.PASSWORD}@{self.HOST}/{self.DB}"
 
 
-app_settings = AppSettings()
-google_settings = GoogleSettings()
-db_settings = DatabaseSettings()
+app_settings = AppSettings() # type: ignore
+google_settings = GoogleSettings() # type: ignore
+db_settings = DatabaseSettings() # type: ignore

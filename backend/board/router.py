@@ -50,26 +50,6 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=1008)
         return
 
-    token = websocket.cookies.get("token")
-
-    # если есть токен — верифицируем
-    user_id: Union[str, None] = None
-    is_authenticated = False
-
-    if token:
-        try:
-            user_data = verify_jwt(token)
-            user_id = user_data["sub"]
-            user_status = user_data["status"]
-            is_authenticated = True
-
-            if user_status == UserStatus.BANNED.value:
-                raise HTTPException(status_code=403, detail="Banned user")
-
-        except HTTPException:
-            await websocket.close(code=1008)
-            return
-
     # Подключаем к сокету
     await websocket.accept()
     await manager.connect(session_id, websocket)
@@ -89,7 +69,6 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             data = await websocket.receive_json()
 
-            # при записи пикселя — определяем идентификатор для кулдауна/логов, используем conn_key как идентификатор
             actor = session_id
 
             if data.get("type") == WSAction.CLEAR.value:
