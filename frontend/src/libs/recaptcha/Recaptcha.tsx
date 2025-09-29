@@ -20,7 +20,6 @@ const Recaptcha: FC<TRecaptchaProps> = ({
   const { token, user } = useContext(AuthContext);
   const { executeRecaptcha } = useGoogleReCaptcha();
 
-
   const handleClick = async () => {
     if (user?.status === "banned") return;
 
@@ -31,7 +30,7 @@ const Recaptcha: FC<TRecaptchaProps> = ({
 
     const captcha = await executeRecaptcha();
 
-    if (token) {
+    if (token && document.location.pathname !== "/mod") {
       RequestAPI.checkCaptcha(token, captcha)
         .then(() => {})
         .catch((err) => {
