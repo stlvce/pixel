@@ -20,6 +20,11 @@ const UserPlace = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [isBoardLoading, setIsBoardLoading] = useState(true);
+  const [isPixelLoading, setIsPixelLoading] = useState(false);
+  const [selectedPixel, setSelectedPixel] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   const ws = useWebsocket({
     onInit: (initCooldown) => {
@@ -55,6 +60,8 @@ const UserPlace = () => {
     },
     onDrawPixel: (...res) => {
       drawPixel(...res);
+      setIsPixelLoading(false);
+      setSelectedPixel(null);
     },
     onClear: (res) => {
       res.forEach((pixel: { x: number; y: number }) => {
@@ -100,10 +107,7 @@ const UserPlace = () => {
     x: number;
     y: number;
   } | null>(null);
-  const [selectedPixel, setSelectedPixel] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
+
 
   // скорость для инерции
   const velocity = useRef({ x: 0, y: 0 });
@@ -129,9 +133,9 @@ const UserPlace = () => {
   const handlePlacePixel = () => {
     if (!selectedPixel || !ws || cooldown > 0) return;
 
+    setIsPixelLoading(true);
     ws.send(JSON.stringify({ ...selectedPixel, color }));
     startTimer();
-    setSelectedPixel(null);
   };
 
   // зум относительно курсора
@@ -548,6 +552,7 @@ const UserPlace = () => {
         handlePlacePixel={handlePlacePixel}
         cooldown={cooldown}
         onCancel={() => setSelectedPixel(null)}
+        isPixelLoading={isPixelLoading}
       />
     </div>
   );

@@ -8,6 +8,7 @@ type TPaintPopupProps = {
   handlePlacePixel: () => void;
   onCancel: () => void;
   cooldown: number;
+  isPixelLoading: boolean;
 };
 
 const PaintPopup: FC<TPaintPopupProps> = ({
@@ -16,11 +17,8 @@ const PaintPopup: FC<TPaintPopupProps> = ({
   handlePlacePixel,
   onCancel,
   cooldown,
+  isPixelLoading,
 }) => {
-  const handlePaint = () => {
-    handlePlacePixel();
-  };
-
   if (!selectedPixel) return null;
 
   return (
@@ -43,8 +41,9 @@ const PaintPopup: FC<TPaintPopupProps> = ({
         </div>
         <Recaptcha
           className="btn btn-primary mt-3 w-full"
-          onSuccess={handlePaint}
+          onSuccess={handlePlacePixel}
           disabled={cooldown > 0}
+          isLoading={isPixelLoading}
         >
           {cooldown > 0 ? `Подожди ${cooldown}с` : "Поставить"}
         </Recaptcha>

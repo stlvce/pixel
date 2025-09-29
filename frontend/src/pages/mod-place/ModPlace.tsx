@@ -27,6 +27,7 @@ const ModPlace = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [isBoardLoading, setIsBoardLoading] = useState(true);
+  const [isPixelLoading, setIsPixelLoading] = useState(false);
 
   const ws = useWebsocket({
     onInit: (initCooldown) => {
@@ -62,6 +63,7 @@ const ModPlace = () => {
     },
     onDrawPixel: (...res) => {
       drawPixel(...res);
+      setIsPixelLoading(false);
     },
     onClear: (res) => {
       res.forEach((pixel: { x: number; y: number }) => {
@@ -136,6 +138,7 @@ const ModPlace = () => {
   const handlePlacePixel = () => {
     if (!selectedPixel || !ws || cooldown > 0) return;
 
+    setIsPixelLoading(true);
     ws.send(JSON.stringify({ ...selectedPixel, color }));
     startTimer();
     setSelectedPixel(null);
@@ -807,6 +810,7 @@ const ModPlace = () => {
         handlePlacePixel={handlePlacePixel}
         cooldown={cooldown}
         onCancel={() => setSelectedPixel(null)}
+        isPixelLoading={isPixelLoading}
       />
     </div>
   );

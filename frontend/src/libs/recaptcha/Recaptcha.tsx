@@ -8,10 +8,11 @@ import { AuthContext } from "@src/store";
 type TRecaptchaProps = DetailedHTMLProps<
   ButtonHTMLAttributes<HTMLButtonElement>,
   HTMLButtonElement
-> & { onSuccess: () => void };
+> & { onSuccess: () => void, isLoading: boolean };
 
 const Recaptcha: FC<TRecaptchaProps> = ({
   onSuccess,
+  isLoading,
   disabled,
   children,
   ...props
@@ -19,7 +20,6 @@ const Recaptcha: FC<TRecaptchaProps> = ({
   const { token, user } = useContext(AuthContext);
   const { executeRecaptcha } = useGoogleReCaptcha();
 
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleClick = async () => {
     if (user?.status === "banned") return;
@@ -32,16 +32,11 @@ const Recaptcha: FC<TRecaptchaProps> = ({
     const captcha = await executeRecaptcha();
 
     if (token) {
-      setIsLoading(true);
-
       RequestAPI.checkCaptcha(token, captcha)
         .then(() => {})
         .catch((err) => {
           console.log(err);
         })
-        .finally(() => {
-          setIsLoading(false);
-        });
     }
 
     onSuccess();

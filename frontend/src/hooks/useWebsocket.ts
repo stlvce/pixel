@@ -43,6 +43,8 @@ export const useWebsocket = ({
     };
 
     connectWS();
+
+    return () => ws?.close();
   }, []);
 
   return ws;
