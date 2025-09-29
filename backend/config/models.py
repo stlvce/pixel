@@ -3,7 +3,7 @@ from sqlalchemy import String, DateTime, Enum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from config.database import Base
-from config.schemas import UserRole, UserStatus
+from config.schemas import UserRole, UserStatus, PixelAction
 
 
 class User(Base):
@@ -31,3 +31,19 @@ class Pixel(Base):
     y: Mapped[int] = mapped_column(index=True)
     color: Mapped[str] = mapped_column(String)
     placed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class PixelLog(Base):
+    __tablename__ = "pixel_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    session_id: Mapped[str] = mapped_column(String, index=True)
+    action: Mapped[PixelAction] = mapped_column(
+        Enum(PixelAction, name="pixel_action_enum"),
+        default=PixelAction.CREATE,
+        nullable=False,
+    )
+    x: Mapped[int] = mapped_column(index=True)
+    y: Mapped[int] = mapped_column(index=True)
+    color: Mapped[str] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -9,13 +9,12 @@ import time
 from sqlalchemy import delete, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from typing import Union
 
 from config.database import async_session, get_db
-from config.models import User, Pixel
+from config.models import User, Pixel, PixelLog
 from board.ws_manager import ConnectionManager
-from auth.security import verify_jwt, get_current_user
-from config.schemas import UserRole, PixelOut, PixelsDeleteIn, UserStatus, WSAction
+from auth.security import get_current_user
+from config.schemas import UserRole, PixelOut, PixelsDeleteIn, WSAction, PixelAction
 
 board_router = APIRouter()
 
@@ -92,6 +91,15 @@ async def websocket_endpoint(websocket: WebSocket):
             async with async_session() as db:
                 pixel = Pixel(x=x, y=y, color=color, session_id=session_id)
                 db.add(pixel)
+
+                log = PixelLog(
+                    session_id=session_id,
+                    x=x,
+                    y=y,
+                    color=color,
+                )
+                db.add(log)
+
                 await db.commit()
 
             cooldowns[actor] = now
@@ -146,11 +154,25 @@ async def delete_pixels(
         {"x": p.x, "y": p.y, "color": p.color, "id": p.id} for p in pixels_to_delete
     ]
 
+    # Логи
+    logs = [
+        PixelLog(
+            session_id=str(user.id),
+            action=PixelAction.REMOVE,
+            x=p.x,
+            y=p.y,
+            color=p.color,
+        )
+        for p in pixels_to_delete
+    ]
+    db.add_all(logs)
+
     # Удаляем пиксели из БД
     stmt = delete(Pixel).where(
         and_(Pixel.x >= x_start, Pixel.x <= x_end, Pixel.y >= y_start, Pixel.y <= y_end)
     )
     await db.execute(stmt)
+
     await db.commit()
 
     return deleted_pixels

@@ -18,6 +18,11 @@ class WSAction(Enum):
     ERROR = "error"
 
 
+class PixelAction(Enum):
+    REMOVE = "remove"
+    CREATE = "create"
+
+
 class UserOut(BaseModel):
     id: int
     email: str
