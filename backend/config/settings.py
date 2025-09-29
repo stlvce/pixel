@@ -15,6 +15,7 @@ class AppSettings(Settings):
     JWT_SECRET: str
     JWT_ALG: str
     JWT_EXPIRE_DAYS: int
+    CORS_ORIGIN: str = "*"
 
 
 class GoogleSettings(Settings):
@@ -38,6 +39,6 @@ class DatabaseSettings(Settings):
         return f"postgresql+asyncpg://{self.USER}:{self.PASSWORD}@{self.HOST}/{self.DB}"
 
 
-app_settings = AppSettings() # type: ignore
-google_settings = GoogleSettings() # type: ignore
-db_settings = DatabaseSettings() # type: ignore
+app_settings = AppSettings()  # type: ignore
+google_settings = GoogleSettings()  # type: ignore
+db_settings = DatabaseSettings()  # type: ignore
