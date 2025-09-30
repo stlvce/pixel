@@ -8,7 +8,7 @@ import { AuthContext } from "@src/store";
 type TRecaptchaProps = DetailedHTMLProps<
   ButtonHTMLAttributes<HTMLButtonElement>,
   HTMLButtonElement
-> & { onSuccess: () => void, isLoading: boolean };
+> & { onSuccess: () => void; isLoading: boolean };
 
 const Recaptcha: FC<TRecaptchaProps> = ({
   onSuccess,
@@ -31,11 +31,9 @@ const Recaptcha: FC<TRecaptchaProps> = ({
     const captcha = await executeRecaptcha();
 
     if (token && document.location.pathname !== "/mod") {
-      RequestAPI.checkCaptcha(token, captcha)
-        .then(() => {})
-        .catch((err) => {
-          console.log(err);
-        })
+      RequestAPI.checkCaptcha(token, captcha);
+    } else {
+      RequestAPI.checkSCaptcha(captcha);
     }
 
     onSuccess();

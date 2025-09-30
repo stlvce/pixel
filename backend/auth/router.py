@@ -178,3 +178,24 @@ async def google_recaptcha(
         raise HTTPException(
             status_code=403, detail="User blocked due to low reCAPTCHA score"
         )
+
+@auth_router.post("/google/scheck")
+async def google_recaptcha(
+    request: Request,
+    code: str,
+):
+    data = {
+        "code": code,
+    }
+
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.post(
+            f"https://www.google.com/recaptcha/api/siteverify?secret={google_settings.CAPTCHA_KEY}&response={code}",
+            data=data,
+        )
+        token_json = token_resp.json()
+
+    is_success = token_json.get("success")
+
+    if not is_success:
+        raise HTTPException(status_code=400, detail="Google reCAPTCHA failed")

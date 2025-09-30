@@ -39,21 +39,6 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def check_origin(request: Request, call_next):
-    if (app_settings.CORS_ORIGIN == "*"):
-        return await call_next(request)
-
-    origin = request.headers.get("origin")
-    referer = request.headers.get("referer")
-
-    if origin and origin != app_settings.CORS_ORIGIN:
-        raise HTTPException(status_code=403, detail="Forbidden origin")
-    if referer and not referer.startswith(app_settings.CORS_ORIGIN):
-        raise HTTPException(status_code=403, detail="Forbidden referer")
-
-    return await call_next(request)
-
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(user_router, prefix="/api/user", tags=["user"])
 app.include_router(board_router, prefix="/api/board", tags=["board"])

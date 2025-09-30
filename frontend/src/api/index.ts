@@ -88,4 +88,16 @@ export default class RequestAPI {
       return res.json();
     });
   }
+
+  static async checkSCaptcha(captcha: string) {
+    const res = fetch(API_URL + "/auth/google/check" + `?code=${captcha}`, {
+      method: "POST",
+    });
+
+    return res.then((res) => {
+      if (!res.ok) return Promise.reject(res);
+
+      return res.json();
+    });
+  }
 }

@@ -15,7 +15,7 @@ class AppSettings(Settings):
     JWT_SECRET: str
     JWT_ALG: str
     JWT_EXPIRE_DAYS: int
-    CORS_ORIGIN: str = "*"
+    CORS_ORIGIN: str
 
 
 class GoogleSettings(Settings):
