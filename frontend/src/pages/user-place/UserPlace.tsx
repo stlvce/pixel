@@ -61,7 +61,6 @@ const UserPlace = () => {
     onDrawPixel: (...res) => {
       drawPixel(...res);
       setIsPixelLoading(false);
-      setSelectedPixel(null);
     },
     onClear: (res) => {
       res.forEach((pixel: { x: number; y: number }) => {
