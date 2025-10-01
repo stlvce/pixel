@@ -44,8 +44,8 @@ const UserPlace = () => {
           ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
           // Рисуем картинку по центру
-          const x = (BOARD_WIDTH - BG_WIDTH) / 2;
-          const y = (BOARD_HEIGHT - BG_HEIGHT) / 2;
+          const x = (200 - BG_WIDTH) / 2;
+          const y = (200 - BG_HEIGHT) / 2;
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(img, x, y, BG_WIDTH, BG_HEIGHT);
 
