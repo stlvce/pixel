@@ -90,7 +90,7 @@ export default class RequestAPI {
   }
 
   static async checkSCaptcha(captcha: string) {
-    const res = fetch(API_URL + "/auth/google/check" + `?code=${captcha}`, {
+    const res = fetch(API_URL + "/auth/google/scheck" + `?code=${captcha}`, {
       method: "POST",
     });
 
