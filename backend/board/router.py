@@ -22,7 +22,7 @@ cooldowns = {}  # кулдаун для юзеров
 manager = ConnectionManager()
 
 
-COOLDOWN = 30
+COOLDOWN = 15
 
 
 @board_router.get("", response_model=list[PixelOut])
